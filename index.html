@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#16181C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cenník">
+<title>Cenník</title>
+<style>
+/* ============================================================
+   CENNÍK — vizuálny jazyk regálovej cenovky
+   ink / paper / hairline + signálne farby + akciová žltá
+   ============================================================ */
+:root{
+  --ink:#16181C;
+  --ink-70:#5A5F68;
+  --ink-40:#9AA0A8;
+  --paper:#FBFAF7;
+  --card:#FFFFFF;
+  --hair:#DCD8CE;
+  --hair-strong:#B9B4A7;
+  --good:#0B6B3A;
+  --good-bg:#E4F0E8;
+  --mid:#7A6A2E;
+  --mid-bg:#F3EFDF;
+  --bad:#B4242B;
+  --bad-bg:#F8E6E5;
+  --promo:#F5D000;
+  --shadow:0 1px 0 rgba(0,0,0,.04), 0 6px 18px -12px rgba(0,0,0,.35);
+  --r:4px;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--sans);
+  background:var(--paper);
+  color:var(--ink);
+  font-size:16px;line-height:1.4;
+  -webkit-font-smoothing:antialiased;
+  overscroll-behavior-y:none;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none;padding:0}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+
+/* --- micro label: mandatory-unit-price vernacular --- */
+.eyebrow{
+  font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-40);
+}
+
+/* ---------- shell ---------- */
+.app{max-width:560px;margin:0 auto;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+header{
+  position:sticky;top:0;z-index:40;background:var(--paper);
+  border-bottom:1px solid var(--hair);
+  padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 0;
+}
+.brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-bottom:10px}
+.brand h1{
+  margin:0;font-size:15px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;
+}
+.brand h1 i{font-style:normal;background:var(--promo);padding:0 4px;border-radius:2px}
+.hdr-actions{display:flex;gap:4px}
+.icon-btn{
+  width:36px;height:36px;display:grid;place-items:center;border-radius:var(--r);
+  color:var(--ink-70);
+}
+.icon-btn:hover{background:#0000000a;color:var(--ink)}
+.icon-btn.on{background:var(--ink);color:#fff}
+main{flex:1;padding:14px 16px calc(96px + var(--safe-b))}
+
+/* ---------- search ---------- */
+.searchwrap{position:relative;padding-bottom:12px}
+.search{
+  width:100%;padding:13px 40px 13px 38px;border:1.5px solid var(--ink);
+  border-radius:var(--r);background:var(--card);font-size:16px;font-weight:500;
+}
+.search::placeholder{color:var(--ink-40);font-weight:400}
+.s-ico{position:absolute;left:12px;top:14px;color:var(--ink-40);pointer-events:none}
+.s-clear{position:absolute;right:6px;top:8px}
+
+/* ---------- generic blocks ---------- */
+.section{margin:22px 0 0}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px}
+.hr{height:1px;background:var(--hair);margin:0 0 10px}
+
+.row{
+  display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  padding:11px 12px;background:var(--card);border:1px solid var(--hair);
+  border-radius:var(--r);margin-bottom:6px;
+}
+.row:active{background:#00000005}
+.row-main{flex:1;min-width:0}
+.row-title{font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row-sub{font-size:12px;color:var(--ink-70);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row-right{text-align:right;flex-shrink:0}
+.row-price{font-weight:700;font-size:15px}
+.row-unit{font-size:11px;color:var(--ink-70);margin-top:1px}
+.stale{opacity:.45}
+
+.pill{
+  display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:2px;
+  font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+}
+.pill.promo{background:var(--promo);color:#3A3000}
+.pill.good{background:var(--good-bg);color:var(--good)}
+.pill.mid{background:var(--mid-bg);color:var(--mid)}
+.pill.bad{background:var(--bad-bg);color:var(--bad)}
+.pill.flat{background:#EFEDE7;color:var(--ink-70)}
+
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.tile{
+  background:var(--card);border:1px solid var(--hair);border-radius:var(--r);
+  padding:10px 11px;text-align:left;min-height:60px;display:flex;flex-direction:column;justify-content:space-between;
+}
+.tile-t{font-weight:600;font-size:13.5px;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.tile-b{display:flex;align-items:baseline;justify-content:space-between;gap:6px;margin-top:6px}
+.tile-p{font-weight:700;font-size:13px}
+.tile-u{font-size:10.5px;color:var(--ink-70)}
+
+/* ---------- SIGNATURE: cenovka ---------- */
+.cenovka{
+  background:var(--card);border:1.5px solid var(--ink);border-radius:var(--r);
+  box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px;
+}
+.cv-top{padding:12px 14px 0}
+.cv-brand{font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-70)}
+.cv-name{font-size:18px;font-weight:700;line-height:1.2;margin-top:2px}
+.cv-price{
+  display:flex;align-items:flex-end;gap:8px;margin:6px 0 2px;
+}
+.cv-price b{font-size:46px;font-weight:800;line-height:.95;letter-spacing:-.03em}
+.cv-price span{font-size:13px;color:var(--ink-70);padding-bottom:5px}
+/* mandatory unit-price strip, like on real shelf labels */
+.cv-unit{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  border:1px solid var(--hair-strong);border-radius:2px;
+  padding:5px 8px;margin:8px 0 12px;background:#FCFBF7;
+}
+.cv-unit b{font-size:15px;font-weight:700}
+.cv-unit small{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-70);font-weight:700}
+
+/* price-range scale */
+.scale{padding:0 14px 12px}
+.scale-track{position:relative;height:9px;border:1px solid var(--hair-strong);border-radius:2px;overflow:hidden;background:#fff}
+.scale-seg{position:absolute;top:0;bottom:0}
+.scale-mark{position:absolute;top:-4px;bottom:-4px;width:3px;background:var(--ink);border-radius:1px}
+.scale-legend{display:flex;justify-content:space-between;margin-top:5px;font-size:10.5px;color:var(--ink-70)}
+
+/* verdict band */
+.verdict{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:11px 14px;border-top:1.5px solid var(--ink);
+}
+.verdict-t{font-size:17px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.verdict-s{font-size:11.5px;opacity:.85;margin-top:1px;font-weight:500}
+.v-good{background:var(--good);color:#fff}
+.v-mid{background:var(--mid-bg);color:var(--mid)}
+.v-bad{background:var(--bad);color:#fff}
+.v-none{background:#EFEDE7;color:var(--ink-70)}
+.v-pct{font-size:26px;font-weight:800;letter-spacing:-.02em;flex-shrink:0}
+
+/* reference numbers */
+.refs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px}
+.ref{background:var(--card);border:1px solid var(--hair);border-radius:var(--r);padding:9px 11px}
+.ref b{display:block;font-size:16px;font-weight:700;margin-top:3px}
+.ref em{font-style:normal;font-size:10.5px;color:var(--ink-40);display:block;margin-top:1px}
+
+/* ---------- buttons ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:12px 16px;border-radius:var(--r);font-weight:700;font-size:15px;
+  border:1.5px solid var(--ink);background:var(--card);
+}
+.btn.primary{background:var(--ink);color:#fff}
+.btn.block{width:100%}
+.btn.sm{padding:7px 11px;font-size:13px;border-width:1px}
+.btn.ghost{border-color:var(--hair);color:var(--ink-70);background:transparent}
+.btn:disabled{opacity:.4}
+.btnbar{display:flex;gap:6px}
+
+/* ---------- fab ---------- */
+.fab{
+  position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(16px + var(--safe-b));z-index:45;
+  width:min(528px,calc(100vw - 32px));
+  box-shadow:0 8px 24px -10px rgba(0,0,0,.5);
+}
+
+/* ---------- sheet ---------- */
+.scrim{position:fixed;inset:0;background:rgba(20,22,26,.42);z-index:60;opacity:0;pointer-events:none;transition:opacity .18s}
+.scrim.open{opacity:1;pointer-events:auto}
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:61;
+  background:var(--paper);border-top:1.5px solid var(--ink);
+  border-radius:12px 12px 0 0;
+  max-width:560px;margin:0 auto;max-height:92dvh;overflow-y:auto;
+  transform:translateY(102%);transition:transform .22s cubic-bezier(.2,.8,.3,1);
+  padding:8px 16px calc(20px + var(--safe-b));
+}
+.sheet.open{transform:translateY(0)}
+.grab{width:36px;height:4px;border-radius:2px;background:var(--hair-strong);margin:4px auto 12px}
+.sheet h2{margin:0 0 12px;font-size:17px;font-weight:800}
+
+/* ---------- form ---------- */
+.field{margin-bottom:12px}
+.field label{display:block;margin-bottom:5px}
+.input{
+  width:100%;padding:11px 12px;border:1px solid var(--hair-strong);border-radius:var(--r);
+  background:var(--card);font-size:16px;
+}
+.input:focus{border-color:var(--ink);outline:none}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.bigprice{font-size:34px;font-weight:800;text-align:center;padding:14px 12px;letter-spacing:-.02em}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{
+  padding:7px 11px;border:1px solid var(--hair-strong);border-radius:100px;
+  font-size:13px;font-weight:600;background:var(--card);
+}
+.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.chip.promo-on{background:var(--promo);color:#3A3000;border-color:#C9AA00}
+.seg{display:flex;border:1px solid var(--hair-strong);border-radius:var(--r);overflow:hidden}
+.seg button{flex:1;padding:10px 4px;font-size:13px;font-weight:600;background:var(--card)}
+.seg button.on{background:var(--ink);color:#fff}
+
+/* ---------- history ---------- */
+.hist{background:var(--card);border:1px solid var(--hair);border-radius:var(--r);overflow:hidden}
+.hitem{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--hair);font-size:13.5px}
+.hitem:last-child{border-bottom:none}
+.hdate{width:74px;flex-shrink:0;color:var(--ink-70);font-size:12px}
+.hstore{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-70);font-size:12.5px}
+.hprice{font-weight:700}
+.hunit{width:82px;text-align:right;font-size:12px;color:var(--ink-70)}
+
+/* sparkline */
+.spark{width:100%;height:56px;display:block;background:var(--card);border:1px solid var(--hair);border-radius:var(--r);margin-bottom:6px}
+
+/* photo */
+.photo{width:56px;height:56px;object-fit:cover;border:1px solid var(--hair);border-radius:var(--r);flex-shrink:0;background:#F0EEE8}
+.photo-lg{width:100%;max-height:200px;object-fit:contain;background:#F5F3EE;border:1px solid var(--hair);border-radius:var(--r)}
+
+/* empty */
+.empty{text-align:center;padding:38px 18px;color:var(--ink-70)}
+.empty b{display:block;font-size:16px;color:var(--ink);margin-bottom:5px}
+.empty p{margin:0 0 16px;font-size:13.5px}
+
+.toast{
+  position:fixed;left:50%;transform:translateX(-50%) translateY(20px);
+  bottom:calc(80px + var(--safe-b));z-index:80;
+  background:var(--ink);color:#fff;padding:10px 16px;border-radius:var(--r);
+  font-size:13.5px;font-weight:600;opacity:0;transition:.2s;pointer-events:none;max-width:88vw;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.banner{
+  background:var(--mid-bg);border:1px solid #E0D5A8;color:var(--mid);
+  padding:9px 12px;border-radius:var(--r);font-size:12.5px;margin-bottom:12px;font-weight:500;
+}
+.note{font-size:12px;color:var(--ink-70);margin:6px 0 0}
+
+/* ---------- sync ---------- */
+.syncbtn{
+  display:flex;align-items:center;gap:6px;padding:5px 9px;border-radius:100px;
+  border:1px solid var(--hair-strong);background:var(--card);
+  font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-70);
+}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ink-40);flex-shrink:0}
+.dot.ok{background:var(--good)}
+.dot.busy{background:var(--promo);animation:pulse 1s infinite}
+.dot.err{background:var(--bad)}
+.dot.off{background:var(--ink-40)}
+@keyframes pulse{50%{opacity:.25}}
+.syncbtn.err{border-color:var(--bad);color:var(--bad)}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--hair);font-size:13px}
+.kv:last-child{border-bottom:none}
+.kv b{font-weight:700}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;word-break:break-all}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <h1>Cen<i>ník</i></h1>
+      <div class="hdr-actions">
+        <button class="syncbtn" id="btnSync" title="Synchronizácia">
+          <span class="dot off" id="syncDot"></span><span id="syncTxt">Len tu</span>
+        </button>
+        <button class="icon-btn" id="btnList" title="Nákupný zoznam" aria-label="Nákupný zoznam">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>
+        </button>
+        <button class="icon-btn" id="btnData" title="Dáta" aria-label="Dáta">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="searchwrap" id="searchwrap">
+      <svg class="s-ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input class="search" id="q" type="search" placeholder="Hľadaj potravinu, značku, EAN…" autocomplete="off" enterkeyhint="search">
+      <button class="icon-btn s-clear" id="qClear" hidden aria-label="Zmazať">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </header>
+  <main id="view"></main>
+</div>
+
+<button class="btn primary fab" id="fab">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+  Nový produkt
+</button>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet"><div class="grab"></div><div id="sheetBody"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ============================================================
+   1. ÚLOŽISKO  —  IndexedDB, s pamäťovým núdzovým režimom
+   ============================================================ */
+const DB = (() => {
+  const NAME = "cennik", VER = 1, STORES = ["articles","products","prices","meta"];
+  let db = null, memory = false, mem = {articles:{},products:{},prices:{},meta:{}};
+
+  function open(){
+    return new Promise(res => {
+      let idb;
+      try { idb = window.indexedDB; } catch(e){ idb = null; }
+      if(!idb){ memory = true; return res(false); }
+      let done = false;
+      const t = setTimeout(()=>{ if(!done){ done=true; memory=true; res(false); } }, 2500);
+      let req;
+      try { req = idb.open(NAME, VER); } catch(e){ clearTimeout(t); memory=true; return res(false); }
+      req.onupgradeneeded = e => {
+        const d = e.target.result;
+        STORES.forEach(s => { if(!d.objectStoreNames.contains(s)) d.createObjectStore(s,{keyPath:"id"}); });
+      };
+      req.onsuccess = e => { if(done) return; done=true; clearTimeout(t); db = e.target.result; res(true); };
+      req.onerror = () => { if(done) return; done=true; clearTimeout(t); memory=true; res(false); };
+      req.onblocked = () => { if(done) return; done=true; clearTimeout(t); memory=true; res(false); };
+    });
+  }
+  function tx(store, mode){ return db.transaction(store, mode).objectStore(store); }
+  function all(store){
+    if(memory) return Promise.resolve(Object.values(mem[store]));
+    return new Promise(res => { const r = tx(store,"readonly").getAll(); r.onsuccess=()=>res(r.result||[]); r.onerror=()=>res([]); });
+  }
+  function put(store, obj){
+    if(memory){ mem[store][obj.id]=obj; return Promise.resolve(); }
+    return new Promise(res => { const r = tx(store,"readwrite").put(obj); r.onsuccess=()=>res(); r.onerror=()=>res(); });
+  }
+  function del(store, id){
+    if(memory){ delete mem[store][id]; return Promise.resolve(); }
+    return new Promise(res => { const r = tx(store,"readwrite").delete(id); r.onsuccess=()=>res(); r.onerror=()=>res(); });
+  }
+  function clear(store){
+    if(memory){ mem[store]={}; return Promise.resolve(); }
+    return new Promise(res => { const r = tx(store,"readwrite").clear(); r.onsuccess=()=>res(); r.onerror=()=>res(); });
+  }
+  return { open, all, put, del, clear, isMemory: () => memory };
+})();
+
+/* ============================================================
+   2. MODEL A STAV
+   ============================================================
+   article  { id, name, unit:'g'|'ml'|'ks', category }
+   product  { id, articleId, brand, name, ean, packSize, packUnit, photo, onList, createdAt }
+   price    { id, productId, date:'YYYY-MM-DD', store, price, packSize, promo:bool, note, createdAt }
+*/
+const S = { articles:[], products:[], prices:[], graves:{articles:{},products:{},prices:{}},
+            lastStore:"", route:{name:"home"}, query:"" };
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const todayISO = () => new Date().toISOString().slice(0,10);
+
+/* Každý zápis nesie čas zmeny — bez toho sa dve zariadenia nedokážu zhodnúť,
+   ktorá verzia záznamu je novšia. Mazanie nechává „náhrobok“, aby sa
+   zmazaný záznam nevrátil z druhého zariadenia späť. */
+const COLLS = ["articles","products","prices"];
+async function saveRec(coll, rec, quiet){
+  rec.updatedAt = Date.now();
+  delete rec.deleted;
+  await DB.put(coll, rec);
+  if(!quiet) scheduleSync();
+}
+async function killRec(coll, id, quiet){
+  const ts = Date.now();
+  S[coll] = S[coll].filter(r => r.id !== id);
+  S.graves[coll][id] = ts;
+  await DB.put(coll, { id, deleted:true, updatedAt:ts });
+  if(!quiet) scheduleSync();
+}
+
+const BASE = { g:{base:"kg", div:1000}, ml:{base:"l", div:1000}, ks:{base:"ks", div:1} };
+
+function unitPrice(price, packSize, packUnit){
+  const b = BASE[packUnit]; if(!b || !packSize) return null;
+  return price / (packSize / b.div);
+}
+function baseLabel(u){ return BASE[u] ? BASE[u].base : u; }
+
+const fmtEur = n => (n==null||isNaN(n)) ? "—" : new Intl.NumberFormat("sk-SK",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n) + " €";
+const fmtEur3 = n => (n==null||isNaN(n)) ? "—" : new Intl.NumberFormat("sk-SK",{minimumFractionDigits:2,maximumFractionDigits:n<10?2:2}).format(n) + " €";
+const parseNum = v => { const s = String(v??"").replace(/\s/g,"").replace(",","."); const n = parseFloat(s); return isNaN(n)?null:n; };
+const daysAgo = iso => Math.round((Date.now() - new Date(iso+"T12:00:00").getTime())/86400000);
+function fmtAge(iso){
+  const d = daysAgo(iso);
+  if(d<=0) return "dnes"; if(d===1) return "včera";
+  if(d<7) return `pred ${d} dňami`;
+  if(d<60) return `pred ${Math.round(d/7)} týž.`;
+  return `pred ${Math.round(d/30)} mes.`;
+}
+const fmtDate = iso => { const [y,m,d]=iso.split("-"); return `${+d}.${+m}.${y.slice(2)}`; };
+
+/* ---- vyhľadávanie: bez diakritiky, po tokenoch ---- */
+const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+function searchProducts(q){
+  const toks = norm(q).split(/\s+/).filter(Boolean);
+  if(!toks.length) return [];
+  return S.products.filter(p => {
+    const a = article(p.articleId);
+    const hay = norm([p.brand,p.name,a&&a.name,a&&a.category,p.ean].join(" "));
+    return toks.every(t => hay.includes(t));
+  });
+}
+const article  = id => S.articles.find(a=>a.id===id);
+const product  = id => S.products.find(p=>p.id===id);
+const pricesOf = id => S.prices.filter(x=>x.productId===id).sort((a,b)=> a.date<b.date?1:a.date>b.date?-1:(b.createdAt||0)-(a.createdAt||0));
+
+/* ============================================================
+   3. ŠTATISTIKA — je toto teraz dobrá cena?
+   ============================================================ */
+const WINDOW_DAYS = 365;
+const STALE_DAYS  = 56;
+
+function quantile(sorted, q){
+  if(!sorted.length) return null;
+  const pos = (sorted.length-1)*q, lo = Math.floor(pos), hi = Math.ceil(pos);
+  return sorted[lo] + (sorted[hi]-sorted[lo])*(pos-lo);
+}
+
+/** Vráti hodnotenie poslednej ceny produktu voči jeho vlastnej histórii. */
+function evaluate(prodId){
+  const p = product(prodId); if(!p) return null;
+  const rows = pricesOf(prodId);
+  if(!rows.length) return { state:"empty" };
+
+  const current = rows[0];
+  const cu = unitPrice(current.price, current.packSize || p.packSize, p.packUnit);
+
+  const hist = rows.slice(1).filter(r => daysAgo(r.date) <= WINDOW_DAYS);
+  const vals = hist.map(r => unitPrice(r.price, r.packSize || p.packSize, p.packUnit)).filter(v=>v!=null);
+  const n = vals.length;
+
+  const regular = rows.filter(r=>!r.promo).map(r=>unitPrice(r.price, r.packSize||p.packSize, p.packUnit)).filter(v=>v!=null).sort((a,b)=>a-b);
+  const promos  = rows.filter(r=> r.promo).map(r=>unitPrice(r.price, r.packSize||p.packSize, p.packUnit)).filter(v=>v!=null).sort((a,b)=>a-b);
+  const refs = {
+    typicalRegular: regular.length ? quantile(regular,.5) : null,
+    bestPromo: promos.length ? promos[0] : null,
+    allTimeLow: Math.min(...[...regular,...promos,cu].filter(v=>v!=null)),
+  };
+
+  if(n < 3) return { state:"learning", current, cu, n, need:3-n, refs };
+
+  const sorted = [...vals].sort((a,b)=>a-b);
+  const below = vals.filter(v => v < cu).length;
+  const pct = Math.round(below / n * 100);
+  const p25 = quantile(sorted,.25), p60 = quantile(sorted,.60);
+
+  let level, title, sub;
+  if(cu <= p25){ level="good"; title="Ber zásobu"; sub="Patrí medzi najnižšie ceny, čo si zapísal"; }
+  else if(cu <= p60){ level="mid"; title="Bežná cena"; sub="Nič výnimočné, ani draho"; }
+  else { level="bad"; title="Počkaj"; sub="Býva to lacnejšie"; }
+
+  const confidence = n >= 7 ? "strong" : "weak";
+  return { state:"ok", current, cu, n, pct, p25, p60, min:sorted[0], max:sorted[sorted.length-1],
+           level, title, sub, confidence, refs };
+}
+
+/** Rebríček značiek v rámci artikla — posledná známa jednotková cena. */
+function ranking(articleId){
+  const a = article(articleId); if(!a) return [];
+  return S.products.filter(p=>p.articleId===articleId).map(p => {
+    const last = pricesOf(p.id)[0];
+    const u = last ? unitPrice(last.price, last.packSize||p.packSize, p.packUnit) : null;
+    return { product:p, last, unit:u, age: last ? daysAgo(last.date) : null };
+  }).filter(r=>r.unit!=null).sort((x,y)=>x.unit-y.unit);
+}
+
+/* ============================================================
+   4. UI POMOCNÍCI
+   ============================================================ */
+const el = id => document.getElementById(id);
+const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let toastT;
+function toast(msg){ const t=el("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2200); }
+function openSheet(html){ el("sheetBody").innerHTML = html; el("sheet").classList.add("open"); el("scrim").classList.add("open"); }
+function closeSheet(){ el("sheet").classList.remove("open"); el("scrim").classList.remove("open"); }
+el("scrim").onclick = closeSheet;
+
+function go(route){ S.route = route; S.query=""; el("q").value=""; el("qClear").hidden=true; render(); window.scrollTo(0,0); }
+
+function productLine(p){
+  const a = article(p.articleId);
+  return [p.brand, a?a.name:"", p.name].filter(Boolean).join(" · ");
+}
+function productTitle(p){ return [p.brand, p.name].filter(Boolean).join(" ") || (article(p.articleId)||{}).name || "Produkt"; }
+function packLabel(p){ return p.packSize ? `${p.packSize} ${p.packUnit}` : ""; }
+
+/* ============================================================
+   5. OBRAZOVKY
+   ============================================================ */
+function render(){
+  const v = el("view");
+  el("btnList").classList.toggle("on", S.route.name==="list");
+  if(S.query.trim()){ v.innerHTML = viewSearch(); }
+  else if(S.route.name==="product"){ v.innerHTML = viewProduct(S.route.id); }
+  else if(S.route.name==="list"){ v.innerHTML = viewList(); }
+  else { v.innerHTML = viewHome(); }
+  el("fab").hidden = S.route.name==="product";
+}
+
+/* ---------- domov ---------- */
+function viewHome(){
+  if(!S.products.length){
+    return `${memBanner()}<div class="empty">
+      <b>Zatiaľ prázdne</b>
+      <p>Pridaj prvý produkt a jeho cenu z regálu. Po pár zápisoch ti Cenník začne hovoriť, či sa oplatí kúpiť.</p>
+      <div class="btnbar" style="justify-content:center">
+        <button class="btn primary" onclick="sheetNewProduct()">Pridaj produkt</button>
+        <button class="btn ghost" onclick="loadSample()">Vlož ukážkové dáta</button>
+      </div></div>`;
+  }
+  const onList = S.products.filter(p=>p.onList);
+  const recent = [...S.products].map(p=>({p, last:pricesOf(p.id)[0]}))
+    .filter(x=>x.last).sort((a,b)=> (b.last.createdAt||0)-(a.last.createdAt||0)).slice(0,6);
+  const counts = {};
+  S.prices.forEach(x => counts[x.productId] = (counts[x.productId]||0)+1);
+  const freq = [...S.products].sort((a,b)=>(counts[b.id]||0)-(counts[a.id]||0)).slice(0,6);
+
+  return `${memBanner()}
+  ${onList.length ? `<div class="section"><div class="section-head"><span class="eyebrow">Nákupný zoznam · ${onList.length}</span>
+      <button class="btn sm ghost" onclick="go({name:'list'})">Otvoriť</button></div><div class="hr"></div>
+      ${onList.slice(0,4).map(p=>rowProduct(p)).join("")}</div>` : ""}
+  <div class="section"><div class="section-head"><span class="eyebrow">Naposledy zapísané</span></div><div class="hr"></div>
+    <div class="tiles">${recent.map(x=>tile(x.p)).join("")}</div></div>
+  <div class="section"><div class="section-head"><span class="eyebrow">Kupuješ najčastejšie</span></div><div class="hr"></div>
+    ${freq.map(p=>rowProduct(p)).join("")}</div>`;
+}
+function memBanner(){
+  return DB.isMemory() ? `<div class="banner">Ukladanie do zariadenia nie je v tomto okne dostupné — dáta zmiznú po zatvorení. Stiahni si súbor a otvor ho priamo v prehliadači telefónu.</div>` : "";
+}
+
+function rowProduct(p){
+  const ev = evaluate(p.id);
+  const last = ev && ev.current;
+  const u = last ? unitPrice(last.price, last.packSize||p.packSize, p.packUnit) : null;
+  const stale = last && daysAgo(last.date) > STALE_DAYS;
+  const pill = ev && ev.state==="ok" ? `<span class="pill ${ev.level}">${ev.pct}%</span>` : "";
+  return `<button class="row ${stale?"stale":""}" onclick="go({name:'product',id:'${p.id}'})">
+    ${p.photo?`<img class="photo" src="${p.photo}" alt="">`:""}
+    <span class="row-main">
+      <span class="row-title">${esc(productTitle(p))} ${last&&last.promo?'<span class="pill promo">akcia</span>':""}</span>
+      <span class="row-sub">${esc((article(p.articleId)||{}).name||"")} · ${esc(packLabel(p))}${last?" · "+fmtAge(last.date):" · bez ceny"}</span>
+    </span>
+    <span class="row-right">
+      <span class="row-price num">${last?fmtEur(last.price):"—"}</span>
+      <span class="row-unit num">${u!=null?fmtEur(u)+"/"+baseLabel(p.packUnit):""}</span>
+    </span>${pill}</button>`;
+}
+function tile(p){
+  const last = pricesOf(p.id)[0];
+  const u = last ? unitPrice(last.price, last.packSize||p.packSize, p.packUnit) : null;
+  return `<button class="tile" onclick="go({name:'product',id:'${p.id}'})">
+    <span class="tile-t">${esc(productTitle(p))}</span>
+    <span class="tile-b"><span class="tile-p num">${last?fmtEur(last.price):"—"}</span>
+      <span class="tile-u num">${u!=null?fmtEur(u)+"/"+baseLabel(p.packUnit):""}</span></span></button>`;
+}
+
+/* ---------- hľadanie ---------- */
+function viewSearch(){
+  const res = searchProducts(S.query);
+  if(!res.length) return `<div class="empty"><b>Nič sa nenašlo</b>
+    <p>„${esc(S.query)}“ zatiaľ v Cenníku nie je.</p>
+    <button class="btn primary" onclick="sheetNewProduct('${esc(S.query).replace(/'/g,"")}')">Pridaj ako nový produkt</button></div>`;
+  return `<div class="section" style="margin-top:4px"><span class="eyebrow">Nájdené · ${res.length}</span><div class="hr" style="margin-top:8px"></div>
+    ${res.map(p=>rowProduct(p)).join("")}</div>`;
+}
+
+/* ---------- nákupný zoznam ---------- */
+function viewList(){
+  const items = S.products.filter(p=>p.onList);
+  if(!items.length) return `<div class="empty"><b>Zoznam je prázdny</b><p>Produkt pridáš na zoznam v jeho detaile.</p>
+    <button class="btn ghost" onclick="go({name:'home'})">Späť</button></div>`;
+  const byArt = {};
+  items.forEach(p => { const a=(article(p.articleId)||{}).category || "Ostatné"; (byArt[a]=byArt[a]||[]).push(p); });
+  return `<div class="section" style="margin-top:4px">
+    <div class="section-head"><span class="eyebrow">Nákupný zoznam · ${items.length}</span>
+      <button class="btn sm ghost" onclick="go({name:'home'})">Hotovo</button></div>
+    ${Object.keys(byArt).sort().map(k=>`<div class="hr"></div><div class="eyebrow" style="margin:12px 0 8px">${esc(k)}</div>${byArt[k].map(p=>rowProduct(p)).join("")}`).join("")}
+  </div>`;
+}
+
+/* ---------- detail produktu: cenovka ---------- */
+function viewProduct(id){
+  const p = product(id); if(!p){ return `<div class="empty"><b>Produkt neexistuje</b><button class="btn ghost" onclick="go({name:'home'})">Späť</button></div>`; }
+  const a = article(p.articleId) || {name:"—", unit:p.packUnit};
+  const ev = evaluate(id);
+  const rows = pricesOf(id);
+  const rank = ranking(p.articleId);
+  const myRank = rank.findIndex(r=>r.product.id===id);
+
+  return `
+  <div style="display:flex;align-items:center;gap:8px;margin:-4px 0 12px">
+    <button class="icon-btn" onclick="go({name:'home'})" aria-label="Späť">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <span class="eyebrow" style="flex:1">${esc(a.name)}</span>
+    <button class="icon-btn ${p.onList?"on":""}" onclick="toggleList('${id}')" title="Na nákupný zoznam" aria-label="Na nákupný zoznam">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+    <button class="icon-btn" onclick="sheetEditProduct('${id}')" aria-label="Upraviť">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 20h4L20 8l-4-4L4 16v4z"/></svg></button>
+  </div>
+
+  ${cenovka(p, ev)}
+
+  <button class="btn primary block" onclick="sheetAddPrice('${id}')" style="margin-bottom:14px">Zapíš cenu z regálu</button>
+
+  ${ev && ev.state!=="empty" ? refsBlock(p, ev) : ""}
+
+  ${rank.length>1 ? `<div class="section" style="margin-top:6px">
+    <div class="section-head"><span class="eyebrow">Alternatívy v „${esc(a.name)}“</span>
+      ${myRank>=0?`<span class="pill flat">${myRank+1}. z ${rank.length}</span>`:""}</div><div class="hr"></div>
+    ${rank.map((r,i)=>rankRow(r,i,rank[0].unit,id)).join("")}
+    <p class="note">Zoradené podľa poslednej známej ceny za ${esc(baseLabel(p.packUnit))}. Vyblednuté záznamy sú staršie ako ${STALE_DAYS} dní.</p>
+  </div>` : `<p class="note">Pridaj konkurenčnú značku do artikla „${esc(a.name)}“ a uvidíš, či sa prémiová vôbec oplatí.</p>
+    <button class="btn sm ghost" style="margin-top:8px" onclick="sheetNewProduct('', '${p.articleId}')">Pridaj konkurenčnú značku</button>`}
+
+  ${rows.length ? `<div class="section">
+    <div class="section-head"><span class="eyebrow">História · ${rows.length}</span></div><div class="hr"></div>
+    ${sparkline(p, rows)}
+    <div class="hist">${rows.slice(0,30).map(r=>histRow(p,r)).join("")}</div>
+  </div>` : ""}
+
+  ${p.photo?`<div class="section"><span class="eyebrow">Fotka</span><div class="hr" style="margin-top:8px"></div><img class="photo-lg" src="${p.photo}" alt=""></div>`:""}
+  <div style="height:20px"></div>`;
+}
+
+function cenovka(p, ev){
+  const a = article(p.articleId)||{};
+  const head = `<div class="cv-top">
+      <div class="cv-brand">${esc(p.brand||a.name||"")}</div>
+      <div class="cv-name">${esc(p.name||a.name||"Produkt")}</div>`;
+
+  if(!ev || ev.state==="empty"){
+    return `<div class="cenovka">${head}
+      <div class="cv-price"><b class="num">—</b><span>${esc(packLabel(p))}</span></div>
+      <div class="cv-unit"><small>Cena za ${esc(baseLabel(p.packUnit))}</small><b class="num">—</b></div></div>
+      <div class="verdict v-none"><div><div class="verdict-t">Bez ceny</div>
+      <div class="verdict-s">Zapíš prvú cenu z regálu</div></div></div></div>`;
+  }
+  const c = ev.current;
+  const priceBlock = `${head}
+      <div class="cv-price"><b class="num">${fmtEur(c.price)}</b><span>${esc(packLabel({packSize:c.packSize||p.packSize,packUnit:p.packUnit}))}${c.promo?" · akcia":""}</span></div>
+      <div class="cv-unit"><small>Cena za ${esc(baseLabel(p.packUnit))}</small><b class="num">${fmtEur(ev.cu)}</b></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        ${c.promo?'<span class="pill promo">Akciová cena</span>':""}
+        <span class="pill flat">${esc(c.store||"bez obchodu")}</span>
+        <span class="pill flat">${fmtAge(c.date)}</span>
+      </div>`;
+
+  if(ev.state==="learning"){
+    return `<div class="cenovka">${priceBlock}
+      <div class="verdict v-none"><div><div class="verdict-t">Zbieram dáta</div>
+        <div class="verdict-s">Ešte ${ev.need} ${ev.need===1?"zápis":"zápisy"} a začnem hodnotiť</div></div>
+        <div class="v-pct num">${ev.n}/3</div></div></div>`;
+  }
+  const lo = Math.min(ev.min, ev.cu), hi = Math.max(ev.max, ev.cu);
+  const span = (hi-lo) || 1;
+  const pos = v => Math.max(0, Math.min(100, (v-lo)/span*100));
+  const p25 = pos(ev.p25), p60 = pos(ev.p60), me = pos(ev.cu);
+  const vcls = ev.level==="good"?"v-good":ev.level==="bad"?"v-bad":"v-mid";
+
+  return `<div class="cenovka">${priceBlock}
+    <div class="scale">
+      <div class="scale-track">
+        <div class="scale-seg" style="left:0;width:${p25}%;background:var(--good-bg)"></div>
+        <div class="scale-seg" style="left:${p25}%;width:${p60-p25}%;background:var(--mid-bg)"></div>
+        <div class="scale-seg" style="left:${p60}%;right:0;background:var(--bad-bg)"></div>
+        <div class="scale-mark" style="left:calc(${me}% - 1.5px)"></div>
+      </div>
+      <div class="scale-legend num"><span>${fmtEur(lo)}</span>
+        <span style="color:var(--ink-40)">${ev.n} ${ev.n<5?"zápisov":"zápisov"} za rok${ev.confidence==="weak"?" · slabý signál":""}</span>
+        <span>${fmtEur(hi)}</span></div>
+    </div>
+    <div class="verdict ${vcls}"><div><div class="verdict-t">${ev.title}</div>
+      <div class="verdict-s">${ev.sub}${ev.confidence==="weak"?" — ale mám málo dát":""}</div></div>
+      <div class="v-pct num">${ev.pct}%</div></div>
+  </div>`;
+}
+
+function refsBlock(p, ev){
+  const r = ev.refs||{};
+  const u = "/"+baseLabel(p.packUnit);
+  return `<div class="refs">
+    <div class="ref"><span class="eyebrow">Bežne stojí</span><b class="num">${r.typicalRegular!=null?fmtEur(r.typicalRegular)+u:"—"}</b><em>medián cien mimo akcie</em></div>
+    <div class="ref"><span class="eyebrow">Najlepšia akcia</span><b class="num">${r.bestPromo!=null?fmtEur(r.bestPromo)+u:"—"}</b><em>${r.bestPromo!=null&&r.typicalRegular?"o "+Math.round((1-r.bestPromo/r.typicalRegular)*100)+" % nižšie":"zatiaľ žiadna"}</em></div>
+  </div>`;
+}
+
+function rankRow(r, i, best, currentId){
+  const p = r.product, diff = best ? (r.unit/best - 1)*100 : 0;
+  const stale = r.age > STALE_DAYS;
+  return `<button class="row ${stale?"stale":""}" style="${p.id===currentId?"border-color:var(--ink);border-width:1.5px":""}" onclick="go({name:'product',id:'${p.id}'})">
+    <span class="eyebrow num" style="width:16px">${i+1}</span>
+    <span class="row-main"><span class="row-title">${esc(productTitle(p))}${r.last&&r.last.promo?' <span class="pill promo">akcia</span>':""}</span>
+      <span class="row-sub">${esc(packLabel(p))} · ${esc(r.last.store||"—")} · ${fmtAge(r.last.date)}</span></span>
+    <span class="row-right"><span class="row-price num">${fmtEur(r.unit)}</span>
+      <span class="row-unit num">za ${esc(baseLabel(p.packUnit))}${i>0?" · +"+Math.round(diff)+" %":""}</span></span></button>`;
+}
+
+function histRow(p, r){
+  const u = unitPrice(r.price, r.packSize||p.packSize, p.packUnit);
+  return `<div class="hitem">
+    <span class="hdate num">${fmtDate(r.date)}</span>
+    <span class="hstore">${esc(r.store||"—")}${r.promo?' <span class="pill promo">A</span>':""}${r.note?" · "+esc(r.note):""}</span>
+    <span class="hprice num">${fmtEur(r.price)}</span>
+    <span class="hunit num">${u!=null?fmtEur(u)+"/"+baseLabel(p.packUnit):""}</span>
+    <button class="icon-btn" style="width:26px;height:26px" onclick="delPrice('${r.id}')" aria-label="Zmazať zápis">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>`;
+}
+
+function sparkline(p, rows){
+  const pts = [...rows].reverse().map(r=>({d:new Date(r.date+"T12:00:00").getTime(), v:unitPrice(r.price,r.packSize||p.packSize,p.packUnit), promo:r.promo})).filter(x=>x.v!=null);
+  if(pts.length<2) return "";
+  const W=520,H=56,PAD=8;
+  const xs=pts.map(x=>x.d), vs=pts.map(x=>x.v);
+  const x0=Math.min(...xs), x1=Math.max(...xs), v0=Math.min(...vs), v1=Math.max(...vs);
+  const sx=d=>PAD+((d-x0)/((x1-x0)||1))*(W-2*PAD);
+  const sy=v=>H-PAD-((v-v0)/((v1-v0)||1))*(H-2*PAD);
+  const path=pts.map((pt,i)=>(i?"L":"M")+sx(pt.d).toFixed(1)+" "+sy(pt.v).toFixed(1)).join(" ");
+  const dots=pts.map(pt=>`<circle cx="${sx(pt.d).toFixed(1)}" cy="${sy(pt.v).toFixed(1)}" r="${pt.promo?3:2}" fill="${pt.promo?"#F5D000":"#16181C"}" stroke="${pt.promo?"#C9AA00":"none"}"/>`).join("");
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Vývoj jednotkovej ceny">
+    <path d="${path}" fill="none" stroke="#16181C" stroke-width="1.6" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>${dots}</svg>`;
+}
+
+/* ============================================================
+   6. AKCIE
+   ============================================================ */
+async function toggleList(id){
+  const p = product(id); p.onList = !p.onList; await saveRec("products", p);
+  toast(p.onList?"Pridané na nákupný zoznam":"Odobrané zo zoznamu"); render();
+}
+async function delPrice(id){
+  if(!confirm("Zmazať tento zápis ceny?")) return;
+  await killRec("prices", id); render(); toast("Zápis zmazaný");
+}
+
+/* ---------- sheet: zápis ceny ---------- */
+const STORES_DEF = ["Lidl","Kaufland","Tesco","Billa","Coop Jednota","Terno","Metro","DM","Rossmann","iné"];
+function sheetAddPrice(id){
+  const p = product(id);
+  _promo = false;
+  const stores = [...new Set([...S.prices.map(x=>x.store).filter(Boolean), ...STORES_DEF])].slice(0,12);
+  openSheet(`
+    <h2>${esc(productTitle(p))}</h2>
+    <div class="field"><label class="eyebrow">Cena na cenovke</label>
+      <input class="input bigprice num" id="f_price" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off"></div>
+    <div class="field"><label class="eyebrow">Veľkosť balenia — over na obale</label>
+      <div class="grid2">
+        <input class="input num" id="f_pack" type="text" inputmode="decimal" value="${p.packSize||""}">
+        <input class="input" value="${esc(p.packUnit)}" disabled></div>
+      <p class="note">Ak sa balenie zmenšilo, prepíš to — jednotková cena to zachytí.</p></div>
+    <div class="field"><label class="eyebrow">Obchod</label>
+      <div class="chips" id="f_stores">${stores.map(s=>`<button class="chip ${s===S.lastStore?"on":""}" data-s="${esc(s)}" onclick="pickStore(this)">${esc(s)}</button>`).join("")}</div></div>
+    <div class="field"><label class="eyebrow">Typ ceny</label>
+      <div class="seg"><button id="f_reg" class="on" onclick="setPromo(false)">Bežná</button>
+        <button id="f_pro" onclick="setPromo(true)">Akcia / klubová</button></div></div>
+    <div class="field"><label class="eyebrow">Dátum</label>
+      <input class="input" id="f_date" type="date" value="${todayISO()}"></div>
+    <div class="btnbar"><button class="btn ghost" onclick="closeSheet()">Zruš</button>
+      <button class="btn primary" style="flex:1" onclick="savePrice('${id}')">Ulož cenu</button></div>`);
+  setTimeout(()=>el("f_price").focus(),260);
+}
+let _promo = false;
+function setPromo(v){ _promo=v; el("f_reg").classList.toggle("on",!v); el("f_pro").classList.toggle("on",v); }
+function pickStore(btn){ [...el("f_stores").children].forEach(c=>c.classList.remove("on")); btn.classList.add("on"); }
+async function savePrice(id){
+  const p = product(id);
+  const price = parseNum(el("f_price").value);
+  if(price==null || price<=0){ toast("Zadaj cenu"); el("f_price").focus(); return; }
+  const pack = parseNum(el("f_pack").value) || p.packSize;
+  const storeBtn = el("f_stores").querySelector(".chip.on");
+  const store = storeBtn ? storeBtn.dataset.s : "";
+  const rec = { id:uid(), productId:id, date:el("f_date").value||todayISO(), store, price, packSize:pack, promo:_promo, note:"", createdAt:Date.now() };
+  S.prices.push(rec); await saveRec("prices", rec, true);
+  if(pack !== p.packSize){ p.packSize = pack; await saveRec("products", p, true); }
+  S.lastStore = store; await DB.put("meta",{id:"lastStore",value:store});
+  scheduleSync();
+  _promo=false; closeSheet(); render();
+  const ev = evaluate(id);
+  toast(ev && ev.state==="ok" ? `${ev.title} — ${ev.pct}. percentil` : "Cena uložená");
+}
+
+/* ---------- sheet: nový / úprava produktu ---------- */
+function sheetNewProduct(prefill="", articleId=""){ productForm(null, prefill, articleId); }
+function sheetEditProduct(id){ productForm(product(id)); }
+function productForm(p, prefill="", articleId=""){
+  const isNew = !p;
+  const arts = [...S.articles].sort((a,b)=>a.name.localeCompare(b.name,"sk"));
+  const curArt = p ? p.articleId : articleId;
+  openSheet(`
+    <h2>${isNew?"Nový produkt":"Upraviť produkt"}</h2>
+    <div class="field"><label class="eyebrow">Artikel — čo to vlastne je</label>
+      <select class="input" id="f_art" onchange="onArtChange()">
+        <option value="__new">＋ nový artikel…</option>
+        ${arts.map(a=>`<option value="${a.id}" ${a.id===curArt?"selected":""}>${esc(a.name)} (${esc(baseLabel(a.unit))})</option>`).join("")}
+      </select>
+      <p class="note">Artikel spája konkurenčné značky, ktoré porovnávaš medzi sebou.</p></div>
+    <div id="f_newart" hidden>
+      <div class="field"><label class="eyebrow">Názov artikla</label>
+        <input class="input" id="f_artname" placeholder="napr. Šampón na vlasy" value="${esc(prefill)}"></div>
+      <div class="field"><label class="eyebrow">Merná jednotka artikla</label>
+        <div class="seg" id="f_unit">
+          <button class="on" data-u="g" onclick="pickUnit(this)">gramy → €/kg</button>
+          <button data-u="ml" onclick="pickUnit(this)">ml → €/l</button>
+          <button data-u="ks" onclick="pickUnit(this)">kusy → €/ks</button></div></div>
+      <div class="field"><label class="eyebrow">Kategória</label>
+        <input class="input" id="f_cat" placeholder="Drogéria / Potraviny / Domácnosť" value="Potraviny"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label class="eyebrow">Značka</label>
+        <input class="input" id="f_brand" placeholder="napr. Head &amp; Shoulders" value="${esc(p?p.brand:"")}"></div>
+      <div class="field"><label class="eyebrow">Variant</label>
+        <input class="input" id="f_name" placeholder="napr. Classic Clean" value="${esc(p?p.name:(isNew?prefill:""))}"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label class="eyebrow">Veľkosť balenia</label>
+        <input class="input num" id="f_psize" type="text" inputmode="decimal" placeholder="400" value="${p?p.packSize:""}"></div>
+      <div class="field"><label class="eyebrow">Jednotka balenia</label>
+        <input class="input" id="f_punit" disabled value="${p?p.packUnit:"g"}"></div>
+    </div>
+    <div class="field"><label class="eyebrow">EAN kód</label>
+      <div style="display:flex;gap:6px">
+        <input class="input num" id="f_ean" type="text" inputmode="numeric" placeholder="nepovinné" value="${esc(p?p.ean:"")}">
+        <button class="btn sm" id="f_scan" onclick="scanEan()" hidden>Skenuj</button></div></div>
+    <div class="field"><label class="eyebrow">Fotka</label>
+      <input class="input" id="f_photo" type="file" accept="image/*" capture="environment" onchange="pickPhoto(this)">
+      <img id="f_prev" class="photo-lg" style="margin-top:8px" ${p&&p.photo?`src="${p.photo}"`:'hidden'}></div>
+    <div class="btnbar">
+      ${isNew?"":`<button class="btn ghost" onclick="deleteProduct('${p.id}')">Zmazať</button>`}
+      <button class="btn ghost" onclick="closeSheet()">Zruš</button>
+      <button class="btn primary" style="flex:1" onclick="saveProduct('${p?p.id:""}')">${isNew?"Vytvor a zapíš cenu":"Ulož"}</button></div>`);
+  _photo = p ? p.photo : null; _unit = "g";
+  onArtChange();
+  if("BarcodeDetector" in window) el("f_scan").hidden = false;
+}
+let _photo = null, _unit = "g";
+function pickUnit(b){ [...el("f_unit").children].forEach(c=>c.classList.remove("on")); b.classList.add("on"); _unit=b.dataset.u; el("f_punit").value=_unit; }
+function onArtChange(){
+  const v = el("f_art").value;
+  const isNew = v==="__new";
+  el("f_newart").hidden = !isNew;
+  if(!isNew){ const a = article(v); if(a) el("f_punit").value = a.unit; }
+  else el("f_punit").value = _unit;
+}
+function pickPhoto(input){
+  const f = input.files && input.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 240, sc = Math.min(1, max/Math.max(img.width,img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width*sc); c.height = Math.round(img.height*sc);
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      _photo = c.toDataURL("image/jpeg", .6);
+      const pv = el("f_prev"); pv.src = _photo; pv.hidden = false;
+    };
+    img.src = e.target.result;
+  };
+  r.readAsDataURL(f);
+}
+async function scanEan(){
+  try{
+    const det = new BarcodeDetector({formats:["ean_13","ean_8","upc_a","upc_e"]});
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+    const v = document.createElement("video"); v.srcObject = stream; v.setAttribute("playsinline",""); await v.play();
+    toast("Namier na čiarový kód…");
+    const t0 = Date.now();
+    const tick = async () => {
+      if(Date.now()-t0 > 15000){ stream.getTracks().forEach(t=>t.stop()); toast("Kód sa nepodarilo prečítať"); return; }
+      try{ const codes = await det.detect(v);
+        if(codes.length){ el("f_ean").value = codes[0].rawValue; stream.getTracks().forEach(t=>t.stop()); toast("EAN načítaný"); return; }
+      }catch(e){}
+      requestAnimationFrame(tick);
+    };
+    tick();
+  }catch(e){ toast("Kamera nie je dostupná"); }
+}
+async function saveProduct(id){
+  let artId = el("f_art").value;
+  if(artId==="__new"){
+    const nm = el("f_artname").value.trim();
+    if(!nm){ toast("Zadaj názov artikla"); return; }
+    const a = { id:uid(), name:nm, unit:_unit, category:(el("f_cat").value||"Ostatné").trim() };
+    S.articles.push(a); await saveRec("articles", a, true); artId = a.id;
+  }
+  const a = article(artId);
+  const p = id ? product(id) : { id:uid(), createdAt:Date.now(), onList:false };
+  p.articleId = artId;
+  p.brand = el("f_brand").value.trim();
+  p.name  = el("f_name").value.trim();
+  p.ean   = el("f_ean").value.trim();
+  p.packSize = parseNum(el("f_psize").value);
+  p.packUnit = a ? a.unit : _unit;
+  p.photo = _photo;
+  if(!p.brand && !p.name){ toast("Zadaj aspoň značku alebo variant"); return; }
+  if(!p.packSize){ toast("Zadaj veľkosť balenia"); return; }
+  if(!id) S.products.push(p);
+  await saveRec("products", p);
+  closeSheet(); go({name:"product", id:p.id});
+  if(!id) setTimeout(()=>sheetAddPrice(p.id), 320);
+}
+async function deleteProduct(id){
+  if(!confirm("Zmazať produkt aj celú jeho cenovú históriu?")) return;
+  const kill = S.prices.filter(x=>x.productId===id);
+  await killRec("products", id, true);
+  for(const k of kill) await killRec("prices", k.id, true);
+  scheduleSync();
+  closeSheet(); go({name:"home"}); toast("Produkt zmazaný");
+}
+
+/* ============================================================
+   7. DÁTA — Excel, záloha, ukážka
+   ============================================================ */
+function sheetData(){
+  openSheet(`<h2>Dáta</h2>
+    <p class="note" style="margin-bottom:14px">${S.articles.length} artiklov · ${S.products.length} produktov · ${S.prices.length} zápisov cien${DB.isMemory()?" · <b>bez trvalého ukladania</b>":""}</p>
+    <div class="field"><label class="eyebrow">Zariadenia</label>
+      <button class="btn block" onclick="sheetSync()">${SYNC.cfg.gistId?"Synchronizácia — prepojené":"Prepojiť telefón a počítač"}</button>
+      <p class="note">Zápisy z oboch zariadení sa zlúčia. Zariadenie offline sa dorovná, keď chytí sieť.</p></div>
+    <div class="field"><label class="eyebrow">Analytika doma</label>
+      <button class="btn block" onclick="exportXlsx()">Stiahni Excel (.xlsx)</button>
+      <p class="note">Tri hárky: Artikle, Produkty, Ceny — vrátane dopočítanej jednotkovej ceny. Potrebuje internet pri prvom exporte.</p></div>
+    <div class="field"><label class="eyebrow">Záloha a prenos medzi zariadeniami</label>
+      <div class="grid2">
+        <button class="btn" onclick="exportJson()">Ulož zálohu</button>
+        <button class="btn" onclick="document.getElementById('f_import').click()">Načítaj zálohu</button></div>
+      <input id="f_import" type="file" accept=".json" hidden onchange="importJson(this)">
+      <p class="note">Záloha funguje aj offline a obsahuje všetko vrátane fotiek.</p></div>
+    <div class="field"><label class="eyebrow">Ostatné</label>
+      <div class="grid2">
+        <button class="btn ghost" onclick="loadSample()">Ukážkové dáta</button>
+        <button class="btn ghost" onclick="wipe()">Zmazať všetko</button></div></div>`);
+}
+function download(blob, name){
+  const u = URL.createObjectURL(blob), a = document.createElement("a");
+  a.href = u; a.download = name; a.click(); setTimeout(()=>URL.revokeObjectURL(u), 1500);
+}
+function exportJson(){
+  const data = { app:"cennik", version:1, exportedAt:new Date().toISOString(), articles:S.articles, products:S.products, prices:S.prices };
+  download(new Blob([JSON.stringify(data)],{type:"application/json"}), `cennik-zaloha-${todayISO()}.json`);
+  toast("Záloha uložená");
+}
+function importJson(input){
+  const f = input.files && input.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = async e => {
+    try{
+      const d = JSON.parse(e.target.result);
+      if(!d.products || !d.prices) throw 0;
+      const merge = async (key, store) => {
+        const have = new Set(S[key].map(x=>x.id));
+        for(const x of d[key]||[]){ if(!have.has(x.id) && !x.deleted){ S[key].push(x); await saveRec(store, x, true); } }
+      };
+      await merge("articles","articles"); await merge("products","products"); await merge("prices","prices");
+      closeSheet(); render(); toast("Záloha načítaná");
+    }catch(err){ toast("Súbor sa nepodarilo prečítať"); }
+  };
+  r.readAsText(f);
+}
+function loadXlsxLib(){
+  return new Promise((res, rej) => {
+    if(window.XLSX) return res();
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+    s.onload = () => res(); s.onerror = () => rej();
+    document.head.appendChild(s);
+  });
+}
+async function exportXlsx(){
+  toast("Pripravujem Excel…");
+  try{ await loadXlsxLib(); }catch(e){ toast("Excel potrebuje internet — použi zálohu"); return; }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(S.articles.map(a=>({
+    ID:a.id, Artikel:a.name, Kategoria:a.category, Jednotka:a.unit, "Cena za":baseLabel(a.unit)
+  }))), "Artikle");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(S.products.map(p=>({
+    ID:p.id, Artikel:(article(p.articleId)||{}).name||"", Znacka:p.brand, Variant:p.name,
+    Balenie:p.packSize, Jednotka:p.packUnit, EAN:p.ean, "Na zozname":p.onList?"ano":""
+  }))), "Produkty");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(S.prices.map(x=>{
+    const p = product(x.productId)||{};
+    const a = article(p.articleId)||{};
+    return { Datum:x.date, Artikel:a.name||"", Znacka:p.brand||"", Variant:p.name||"", Obchod:x.store,
+      Cena:x.price, Balenie:x.packSize||p.packSize, Jednotka:p.packUnit,
+      "Jednotkova cena":Math.round((unitPrice(x.price, x.packSize||p.packSize, p.packUnit)||0)*10000)/10000,
+      "Za":baseLabel(p.packUnit), Akcia:x.promo?"ano":"", EAN:p.ean||"", Poznamka:x.note||"" };
+  }).sort((a,b)=>a.Datum<b.Datum?1:-1)), "Ceny");
+  XLSX.writeFile(wb, `cennik-${todayISO()}.xlsx`);
+  toast("Excel stiahnutý");
+}
+async function wipe(){
+  const synced = !!(SYNC.cfg.token && SYNC.cfg.gistId);
+  if(!confirm(synced
+    ? "Zmazať všetky dáta na TOMTO aj na ostatných prepojených zariadeniach?"
+    : "Naozaj zmazať všetky artikle, produkty a ceny?")) return;
+  for(const coll of COLLS){ for(const r of [...S[coll]]) await killRec(coll, r.id, true); }
+  scheduleSync();
+  closeSheet(); go({name:"home"}); toast("Vymazané");
+}
+
+/* ---------- ukážkové dáta ---------- */
+async function loadSample(){
+  const mk = (n,u,c)=>({id:uid(),name:n,unit:u,category:c});
+  const A = [ mk("Šampón na vlasy","ml","Drogéria"), mk("Toaletný papier","ks","Domácnosť"), mk("Mlieko polotučné","ml","Potraviny") ];
+  const P = [
+    {a:0,brand:"Head & Shoulders",name:"Classic Clean",size:400,ean:"8001090363619"},
+    {a:0,brand:"Schauma",name:"7 bylín",size:400,ean:"9000101318876"},
+    {a:0,brand:"Cien",name:"Kokos",size:300,ean:"20064507"},
+    {a:1,brand:"Zewa",name:"Deluxe 3-vrstvový",size:16,ean:"7322540829723"},
+    {a:1,brand:"Floralys",name:"3-vrstvový",size:16,ean:"20812294"},
+    {a:2,brand:"Rajo",name:"1,5 %",size:1000,ean:"8586001010204"},
+    {a:2,brand:"Pilos",name:"1,5 %",size:1000,ean:"20050654"},
+  ];
+  const stores = ["Lidl","Kaufland","Tesco","Billa"];
+  const bases  = [4.29, 2.79, 1.99, 6.49, 3.99, 1.19, 0.95];
+  const prods = P.map((x,i)=>({ id:uid(), articleId:A[x.a].id, brand:x.brand, name:x.name, ean:x.ean,
+    packSize:x.size, packUnit:A[x.a].unit, photo:null, onList:i===0||i===5, createdAt:Date.now()-i }));
+  const prices = [];
+  prods.forEach((p,i)=>{
+    const base = bases[i];
+    const n = 6 + Math.floor(Math.random()*5);
+    for(let k=n;k>=0;k--){
+      const d = new Date(); d.setDate(d.getDate() - Math.round(k*30 + Math.random()*12));
+      const promo = Math.random() < .3;
+      const drift = 1 + (n-k)*0.012;                 // mierna inflácia v čase
+      const noise = 1 + (Math.random()-.5)*0.10;
+      const val = base * drift * noise * (promo ? 0.72 : 1);
+      prices.push({ id:uid(), productId:p.id, date:d.toISOString().slice(0,10),
+        store:stores[Math.floor(Math.random()*stores.length)], price:Math.round(val*100)/100,
+        packSize:p.packSize, promo, note:"", createdAt:d.getTime() });
+    }
+  });
+  for(const a of A){ S.articles.push(a); await saveRec("articles", a, true); }
+  for(const p of prods){ S.products.push(p); await saveRec("products", p, true); }
+  for(const x of prices){ S.prices.push(x); await saveRec("prices", x, true); }
+  scheduleSync();
+  closeSheet(); go({name:"home"}); toast("Ukážkové dáta vložené");
+}
+
+/* ============================================================
+   7b. SYNCHRONIZÁCIA — telefón ⇄ PC cez GitHub Gist
+   ------------------------------------------------------------
+   Zariadenie pracuje vždy zo svojej lokálnej kópie. Pri synchronizácii
+   sa stiahne vzdialená verzia, obe sa zlúčia po jednotlivých záznamoch
+   (vyhráva ten s novším časom zmeny) a výsledok sa uloží späť na obe
+   strany. Žiadne zariadenie teda neprepíše prácu toho druhého.
+   ============================================================ */
+const GIST_FILE = "cennik-data.json";
+const SYNC = { cfg:{token:"",gistId:"",lastSyncAt:0}, state:"off", msg:"", busy:false, again:false, timer:null };
+
+function setSync(state, msg){
+  SYNC.state = state; SYNC.msg = msg||"";
+  const dot = el("syncDot"), txt = el("syncTxt"), btn = el("btnSync");
+  if(!dot) return;
+  const map = {
+    off:    ["off",  "Len tu"],
+    idle:   ["ok",   lastSyncLabel()],
+    syncing:["busy", "Sync…"],
+    offline:["off",  "Offline"],
+    error:  ["err",  "Chyba"],
+  };
+  const [cls, label] = map[state] || map.off;
+  dot.className = "dot " + cls;
+  txt.textContent = label;
+  btn.classList.toggle("err", state==="error");
+  btn.title = msg || (state==="off" ? "Synchronizácia nie je nastavená" : "Synchronizácia");
+}
+function lastSyncLabel(){
+  if(!SYNC.cfg.lastSyncAt) return "Prepojené";
+  const m = Math.round((Date.now()-SYNC.cfg.lastSyncAt)/60000);
+  if(m < 1) return "Aktuálne";
+  if(m < 60) return "Pred " + m + " min";
+  return "Pred " + Math.round(m/60) + " h";
+}
+async function loadSyncCfg(){
+  const meta = await DB.all("meta");
+  const c = meta.find(m=>m.id==="sync");
+  if(c && c.value) SYNC.cfg = Object.assign(SYNC.cfg, c.value);
+}
+const saveSyncCfg = () => DB.put("meta", { id:"sync", value:SYNC.cfg });
+
+async function gh(path, opts){
+  opts = opts || {};
+  const r = await fetch("https://api.github.com" + path, Object.assign({}, opts, {
+    headers: Object.assign({
+      "Authorization": "Bearer " + SYNC.cfg.token,
+      "Accept": "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28"
+    }, opts.headers || {})
+  }));
+  if(r.status === 401) throw new Error("Token neplatí alebo mu chýba oprávnenie gist");
+  if(r.status === 404) throw new Error("Úložisko sa nenašlo — prepoj zariadenie znova");
+  if(r.status === 403) throw new Error("GitHub dočasne odmietol požiadavku, skús o chvíľu");
+  if(!r.ok) throw new Error("GitHub odpovedal " + r.status);
+  return r.json();
+}
+
+/* --- prevod medzi lokálnym stavom a prenášaným balíkom --- */
+function buildPayload(){
+  const out = { v:1, updatedAt:Date.now(), articles:[], products:[], prices:[] };
+  for(const c of COLLS){
+    out[c] = S[c].map(r => r);
+    for(const id in S.graves[c]) out[c].push({ id, deleted:true, updatedAt:S.graves[c][id] });
+  }
+  return out;
+}
+/** Zlúči dva balíky po záznamoch. Novší čas zmeny vyhráva. */
+function mergePayloads(local, remote){
+  const merged = { v:1, updatedAt:Date.now(), articles:[], products:[], prices:[] };
+  let localChanged = false, remoteChanged = false;
+  for(const c of COLLS){
+    const L = {}, R = {};
+    (local[c] || []).forEach(r => L[r.id] = r);
+    (remote && remote[c] || []).forEach(r => R[r.id] = r);
+    const ids = new Set([...Object.keys(L), ...Object.keys(R)]);
+    for(const id of ids){
+      const l = L[id], r = R[id];
+      let win;
+      if(!r){ win = l; remoteChanged = true; }
+      else if(!l){ win = r; localChanged = true; }
+      else if((l.updatedAt||0) >= (r.updatedAt||0)){
+        win = l; if((l.updatedAt||0) > (r.updatedAt||0)) remoteChanged = true;
+      } else { win = r; localChanged = true; }
+      merged[c].push(win);
+    }
+  }
+  return { merged, localChanged, remoteChanged };
+}
+/** Zapíše zlúčený výsledok do lokálnej databázy a stavu. */
+async function applyPayload(p){
+  const CUT = Date.now() - 180*86400000;   // náhrobky staršie ako pol roka zahodíme
+  for(const c of COLLS){
+    const live = [], graves = {};
+    for(const r of p[c] || []){
+      if(r.deleted){ if((r.updatedAt||0) > CUT) graves[r.id] = r.updatedAt; }
+      else live.push(r);
+    }
+    const before = {};
+    S[c].forEach(r => before[r.id] = r.updatedAt||0);
+    const prevGraves = S.graves[c];
+    S[c] = live; S.graves[c] = graves;
+    for(const r of live) if(before[r.id] !== (r.updatedAt||0)) await DB.put(c, r);
+    for(const id in graves) if(prevGraves[id] !== graves[id]) await DB.put(c, {id, deleted:true, updatedAt:graves[id]});
+  }
+}
+async function pullPayload(){
+  const g = await gh("/gists/" + SYNC.cfg.gistId);
+  const f = g.files && g.files[GIST_FILE];
+  if(!f) return null;
+  let txt = f.content;
+  if(f.truncated && f.raw_url){ txt = await (await fetch(f.raw_url)).text(); }
+  try { return JSON.parse(txt); } catch(e){ return null; }
+}
+const pushPayload = p => gh("/gists/" + SYNC.cfg.gistId, {
+  method:"PATCH",
+  headers:{"Content-Type":"application/json"},
+  body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(p) } } })
+});
+
+function scheduleSync(){
+  if(!SYNC.cfg.token || !SYNC.cfg.gistId) return;
+  clearTimeout(SYNC.timer);
+  SYNC.timer = setTimeout(() => doSync(), 2500);
+}
+async function doSync(force){
+  if(!SYNC.cfg.token || !SYNC.cfg.gistId){ setSync("off"); return; }
+  if(!navigator.onLine){ setSync("offline"); return; }
+  if(SYNC.busy){ SYNC.again = true; return; }
+  SYNC.busy = true; setSync("syncing");
+  try{
+    const remote = await pullPayload();
+    const { merged, localChanged, remoteChanged } = mergePayloads(buildPayload(), remote);
+    if(localChanged) await applyPayload(merged);
+    if(remoteChanged || !remote || force) await pushPayload(merged);
+    SYNC.cfg.lastSyncAt = Date.now(); await saveSyncCfg();
+    setSync("idle");
+    if(localChanged){ render(); if(el("sheet").classList.contains("open") && el("syncPanel")) sheetSync(); }
+  }catch(e){
+    setSync("error", e.message);
+  }
+  SYNC.busy = false;
+  if(SYNC.again){ SYNC.again = false; setTimeout(()=>doSync(), 400); }
+}
+
+/* --- prepojenie zariadenia --- */
+async function syncConnect(){
+  const t = el("s_token").value.trim();
+  if(!t){ toast("Vlož token"); return; }
+  SYNC.cfg.token = t;
+  setSync("syncing");
+  try{
+    const list = await gh("/gists?per_page=100");
+    let g = list.find(x => x.files && x.files[GIST_FILE]);
+    if(!g){
+      g = await gh("/gists", { method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ description:"Cenník — dáta", public:false,
+          files:{ [GIST_FILE]: { content: JSON.stringify(buildPayload()) } } }) });
+      toast("Úložisko vytvorené");
+    } else toast("Našiel som existujúce úložisko");
+    SYNC.cfg.gistId = g.id;
+    await saveSyncCfg();
+    await doSync(true);
+    sheetSync();
+  }catch(e){
+    SYNC.cfg.token = ""; setSync("error", e.message); sheetSync();
+  }
+}
+async function syncDisconnect(){
+  if(!confirm("Odpojiť toto zariadenie? Dáta v ňom zostanú, len sa prestanú synchronizovať.")) return;
+  SYNC.cfg = { token:"", gistId:"", lastSyncAt:0 };
+  await saveSyncCfg(); setSync("off"); sheetSync();
+}
+
+function sheetSync(){
+  const on = !!(SYNC.cfg.token && SYNC.cfg.gistId);
+  openSheet(`<div id="syncPanel"><h2>Synchronizácia</h2>
+  ${on ? `
+    <div style="margin-bottom:14px">
+      <div class="kv"><span>Stav</span><b>${SYNC.state==="error"?`<span style="color:var(--bad)">${esc(SYNC.msg)}</span>`:esc(lastSyncLabel())}</b></div>
+      <div class="kv"><span>Obsah</span><b class="num">${S.products.length} produktov · ${S.prices.length} cien</b></div>
+      <div class="kv"><span>Úložisko</span><b class="mono">${esc(SYNC.cfg.gistId.slice(0,12))}…</b></div>
+    </div>
+    <button class="btn primary block" onclick="doSync(true)" style="margin-bottom:8px">Synchronizuj teraz</button>
+    <div class="field"><label class="eyebrow">Prepojiť ďalšie zariadenie</label>
+      <p class="note" style="margin-top:0">Na druhom zariadení otvor tú istú adresu, choď sem a vlož ten istý token. Úložisko si nájde samo.</p></div>
+    <button class="btn ghost block" onclick="syncDisconnect()">Odpojiť toto zariadenie</button>
+  ` : `
+    <p class="note" style="margin:0 0 14px">Prepojí telefón a počítač cez tvoj vlastný súkromný GitHub Gist. Dáta nejdú cez žiadny cudzí server a appka funguje ďalej aj bez signálu — zosúladí sa, keď je sieť.</p>
+    <div class="field"><label class="eyebrow">Krok 1 — vytvor token</label>
+      <p class="note" style="margin-top:0">Na <b>github.com/settings/tokens</b> → Generate new token (classic) → zaškrtni jedine <b>gist</b> → skopíruj.</p></div>
+    <div class="field"><label class="eyebrow">Krok 2 — vlož ho sem</label>
+      <input class="input mono" id="s_token" type="password" placeholder="ghp_…" autocomplete="off"></div>
+    ${SYNC.state==="error"?`<p class="note" style="color:var(--bad)">${esc(SYNC.msg)}</p>`:""}
+    <button class="btn primary block" onclick="syncConnect()">Prepoj zariadenie</button>
+    <p class="note">Token zostáva uložený len v tomto zariadení. Oprávnenie <b>gist</b> mu nedáva prístup k ničomu inému na tvojom účte.</p>
+  `}</div>`);
+}
+
+/* ============================================================
+   8. ŠTART
+   ============================================================ */
+el("q").addEventListener("input", e => {
+  S.query = e.target.value; el("qClear").hidden = !S.query;
+  if(S.query.trim() && S.route.name!=="home") S.route={name:"home"};
+  render();
+});
+el("qClear").onclick = () => { S.query=""; el("q").value=""; el("qClear").hidden=true; el("q").focus(); render(); };
+el("fab").onclick = () => sheetNewProduct(S.query.trim());
+el("btnData").onclick = sheetData;
+el("btnSync").onclick = sheetSync;
+el("btnList").onclick = () => go({name: S.route.name==="list" ? "home" : "list"});
+
+(async () => {
+  await DB.open();
+  for(const c of COLLS){
+    const rows = await DB.all(c);
+    S[c] = [];
+    for(const r of rows){
+      if(r.deleted){ S.graves[c][r.id] = r.updatedAt || 0; continue; }
+      if(!r.updatedAt){ r.updatedAt = r.createdAt || Date.now(); await DB.put(c, r); }  // migrácia z v1.0
+      S[c].push(r);
+    }
+  }
+  const meta = await DB.all("meta");
+  const ls = meta.find(m=>m.id==="lastStore"); if(ls) S.lastStore = ls.value;
+  await loadSyncCfg();
+  render();
+  setSync(SYNC.cfg.token && SYNC.cfg.gistId ? "idle" : "off");
+  doSync();
+})();
+
+/* zosúladenie pri návrate k appke, po prebudení siete a raz za 5 minút */
+document.addEventListener("visibilitychange", () => { if(!document.hidden) doSync(); });
+window.addEventListener("online",  () => doSync());
+window.addEventListener("offline", () => setSync("offline"));
+setInterval(() => { if(!document.hidden) doSync(); }, 300000);
+setInterval(() => { if(SYNC.state==="idle") setSync("idle"); }, 60000);
+
+/* manifest pre pridanie na plochu */
+(() => {
+  const m = { name:"Cenník", short_name:"Cenník", start_url:".", display:"standalone",
+    background_color:"#FBFAF7", theme_color:"#16181C", orientation:"portrait",
+    icons:[{ src:"data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="28" fill="#16181C"/><rect x="24" y="52" width="144" height="88" rx="6" fill="#FBFAF7"/><rect x="24" y="52" width="144" height="16" fill="#F5D000"/><text x="96" y="122" font-family="Arial,sans-serif" font-size="52" font-weight="800" text-anchor="middle" fill="#16181C">€</text></svg>`))),
+      sizes:"192x192", type:"image/svg+xml", purpose:"any" }] };
+  const l = document.createElement("link");
+  l.rel = "manifest";
+  l.href = "data:application/manifest+json;charset=utf-8," + encodeURIComponent(JSON.stringify(m));
+  document.head.appendChild(l);
+})();
+</script>
+</body>
+</html>
