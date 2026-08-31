@@ -639,7 +639,7 @@ function viewProduct(id){
   <div style="display:flex;align-items:center;gap:8px;margin:-4px 0 12px">
     <button class="icon-btn" onclick="go({name:'home'})" aria-label="Späť">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
-    <span class="eyebrow" style="flex:1">${esc(a.name)}</span>
+    <button class="eyebrow" style="flex:1;text-align:left;padding:6px 0" onclick="sheetEditArticle('${p.articleId}')">${esc(a.name)} ›</button>
     <button class="icon-btn ${p.onList?"on":""}" onclick="toggleList('${id}')" title="Na nákupný zoznam" aria-label="Na nákupný zoznam">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg></button>
     <button class="icon-btn" onclick="sheetEditProduct('${id}')" aria-label="Upraviť">
@@ -869,6 +869,92 @@ async function savePrice(id){
   toast(ev && ev.state==="ok" ? `${ev.title} — ${ev.pct}. percentil` : "Cena uložená");
 }
 
+/* ---------- sheet: správa artiklov ---------- */
+function articleStats(id){
+  const prods = S.products.filter(p => p.articleId === id);
+  const ids = new Set(prods.map(p => p.id));
+  return { n: prods.length, prices: S.prices.filter(x => ids.has(x.productId)).length };
+}
+const skloň = (n, a, b, c) => n === 1 ? a : (n >= 2 && n <= 4) ? b : c;
+
+function sheetArticles(){
+  const arts = [...S.articles].sort((a,b) => a.name.localeCompare(b.name,"sk"));
+  openSheet(`<h2>Artikle</h2>
+    <p class="note" style="margin:0 0 12px">Artikel spája konkurenčné značky, ktoré porovnávaš medzi sebou. Klepni naň a uprav ho.</p>
+    ${arts.length ? arts.map(a => {
+      const st = articleStats(a.id);
+      return `<button class="row" onclick="sheetEditArticle('${a.id}')">
+        <span class="row-main"><span class="row-title">${esc(a.name)}</span>
+          <span class="row-sub">${esc(a.category||"—")} · cena za ${esc(baseLabel(a.unit))}</span></span>
+        <span class="row-right"><span class="row-price num">${st.n}</span>
+          <span class="row-unit">${skloň(st.n,"produkt","produkty","produktov")}</span></span>
+        ${st.n === 0 ? '<span class="pill bad">prázdny</span>' : ""}</button>`;
+    }).join("") : `<p class="note">Zatiaľ žiadne artikle.</p>`}`);
+}
+let _aUnit = "g";
+function pickAUnit(b){ [...el("a_unit").children].forEach(c => c.classList.remove("on")); b.classList.add("on"); _aUnit = b.dataset.u; }
+
+function sheetEditArticle(id){
+  const a = article(id); if(!a) return;
+  const st = articleStats(id);
+  const units = [["g","gramy → €/kg"],["ml","ml → €/l"],["ks","kusy → €/ks"]];
+  openSheet(`<h2>Upraviť artikel</h2>
+    <div class="field"><label class="eyebrow">Názov</label>
+      <input class="input" id="a_name" value="${esc(a.name)}"></div>
+    <div class="field"><label class="eyebrow">Kategória</label>
+      <input class="input" id="a_cat" value="${esc(a.category||"")}" placeholder="Potraviny / Drogéria / Domácnosť"></div>
+    <div class="field"><label class="eyebrow">Merná jednotka</label>
+      <div class="seg" id="a_unit">${units.map(([u,l]) =>
+        `<button class="${a.unit===u?"on":""}" data-u="${u}" onclick="pickAUnit(this)">${l}</button>`).join("")}</div>
+      ${st.n ? `<p class="note">Zmena jednotky sa prepíše u všetkých ${st.n} ${skloň(st.n,"produktu","produktov","produktov")}. Čísla veľkostí balení zostanú rovnaké, len sa inak prepočítajú — over si ich potom.</p>` : ""}</div>
+    <div class="kv"><span>Obsahuje</span><b class="num">${st.n} ${skloň(st.n,"produkt","produkty","produktov")} · ${st.prices} ${skloň(st.prices,"zápis","zápisy","zápisov")} cien</b></div>
+    <div class="btnbar" style="margin-top:14px">
+      <button class="btn ghost" onclick="sheetArticles()">Späť</button>
+      <button class="btn primary" style="flex:1" onclick="saveArticle('${id}')">Ulož</button></div>
+    <button class="btn block" style="margin-top:8px;border-color:var(--bad);color:var(--bad)" onclick="deleteArticle('${id}')">Zmazať artikel</button>`);
+  _aUnit = a.unit;
+}
+async function saveArticle(id){
+  const a = article(id); if(!a) return;
+  const name = el("a_name").value.trim();
+  if(!name){ toast("Zadaj názov artikla"); return; }
+  const st = articleStats(id);
+  const unitChanged = _aUnit !== a.unit;
+  if(unitChanged && st.n && !confirm(
+    `Zmeniť mernú jednotku na ${baseLabel(_aUnit)}?\n\nPrepíše sa u ${st.n} ${skloň(st.n,"produktu","produktov","produktov")} a všetky jednotkové ceny sa prepočítajú nanovo.`)) return;
+  a.name = name;
+  a.category = el("a_cat").value.trim() || "Ostatné";
+  a.unit = _aUnit;
+  await saveRec("articles", a, true);
+  if(unitChanged){
+    for(const p of S.products.filter(p => p.articleId === id)){ p.packUnit = _aUnit; await saveRec("products", p, true); }
+  }
+  scheduleSync(); closeSheet(); render(); toast("Artikel uložený");
+}
+async function deleteArticle(id){
+  const a = article(id); if(!a) return;
+  const st = articleStats(id);
+  if(st.n === 0){
+    if(!confirm(`Zmazať prázdny artikel „${a.name}“?`)) return;
+  } else {
+    if(!confirm(
+      `POZOR — artikel „${a.name}“ nie je prázdny.\n\n` +
+      `Zmaže sa aj ${st.n} ${skloň(st.n,"produkt","produkty","produktov")} a ${st.prices} ${skloň(st.prices,"zápis","zápisy","zápisov")} cien, teda celá ich história.\n\n` +
+      `Zmazanie sa nedá vrátiť späť a prejaví sa aj na ostatných prepojených zariadeniach.`)) return;
+    if(!confirm(`Posledné potvrdenie: naozaj natrvalo zmazať „${a.name}“ aj s ${st.prices} ${skloň(st.prices,"zápisom","zápismi","zápismi")} cien?`)) return;
+  }
+  const prods = S.products.filter(p => p.articleId === id);
+  for(const p of prods){
+    for(const x of S.prices.filter(q => q.productId === p.id)) await killRec("prices", x.id, true);
+    await killRec("products", p.id, true);
+  }
+  await killRec("articles", id, true);
+  scheduleSync();
+  closeSheet();
+  if(S.route.name === "product" && !product(S.route.id)) go({name:"home"}); else render();
+  toast(st.n ? "Artikel a jeho produkty zmazané" : "Artikel zmazaný");
+}
+
 /* ---------- sheet: nový / úprava produktu ---------- */
 function sheetNewProduct(prefill="", articleId=""){ productForm(null, prefill, articleId); }
 function sheetEditProduct(id){ productForm(product(id)); }
@@ -1008,6 +1094,9 @@ function sheetData(){
       <b class="num">${APP_VERSION}${("serviceWorker" in navigator && navigator.serviceWorker.controller)?" · offline pripravené":""}</b></div>
     <div class="field" style="margin-top:10px">
       <button class="btn ghost block" onclick="checkUpdate(true);closeSheet()">Skontrolovať aktualizáciu</button></div>
+    <div class="field"><label class="eyebrow">Štruktúra</label>
+      <button class="btn block" onclick="sheetArticles()">Artikle · ${S.articles.length}</button>
+      <p class="note">Premenovať, zmeniť mernú jednotku alebo zmazať aj s celou históriou.</p></div>
     <div class="field"><label class="eyebrow">Zariadenia</label>
       <button class="btn block" onclick="sheetSync()">${SYNC.cfg.gistId?"Synchronizácia — prepojené":"Prepojiť telefón a počítač"}</button>
       <p class="note">Zápisy z oboch zariadení sa zlúčia. Zariadenie offline sa dorovná, keď chytí sieť.</p></div>
@@ -1138,7 +1227,7 @@ async function loadSample(){
    a porovná číslo verzie s tým, ktoré práve beží. Ak sa líši,
    ponúkne aktualizáciu — nič sa nedeje na pozadí bez tvojho vedomia.
    ============================================================ */
-const APP_VERSION = "1.7";
+const APP_VERSION = "1.8";
 const SHELL_CACHE = "cennik-shell-v1";
 let _updSeen = "", _updLast = 0, _updTried = null;
 
