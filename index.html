@@ -1001,8 +1001,10 @@ async function deleteProduct(id){
 function sheetData(){
   openSheet(`<h2>Dáta</h2>
     <p class="note" style="margin-bottom:14px">${S.articles.length} artiklov · ${S.products.length} produktov · ${S.prices.length} zápisov cien${DB.isMemory()?" · <b>bez trvalého ukladania</b>":""}</p>
-    <div class="kv" style="margin-bottom:14px"><span>Verzia appky</span>
+    <div class="kv"><span>Verzia appky</span>
       <b class="num">${APP_VERSION}${("serviceWorker" in navigator && navigator.serviceWorker.controller)?" · offline pripravené":""}</b></div>
+    <div class="field" style="margin-top:10px">
+      <button class="btn ghost block" onclick="checkUpdate(true);closeSheet()">Skontrolovať aktualizáciu</button></div>
     <div class="field"><label class="eyebrow">Zariadenia</label>
       <button class="btn block" onclick="sheetSync()">${SYNC.cfg.gistId?"Synchronizácia — prepojené":"Prepojiť telefón a počítač"}</button>
       <p class="note">Zápisy z oboch zariadení sa zlúčia. Zariadenie offline sa dorovná, keď chytí sieť.</p></div>
@@ -1133,34 +1135,64 @@ async function loadSample(){
    a porovná číslo verzie s tým, ktoré práve beží. Ak sa líši,
    ponúkne aktualizáciu — nič sa nedeje na pozadí bez tvojho vedomia.
    ============================================================ */
-const APP_VERSION = "1.4";
-let _updSeen = "", _updLast = 0;
+const APP_VERSION = "1.5";
+const SHELL_CACHE = "cennik-shell-v1";
+let _updSeen = "", _updLast = 0, _updTried = null;
 
+/** Stiahne aktuálny súbor zo servera mimo akejkoľvek cache. */
+async function fetchFresh(){
+  const r = await fetch("index.html?nocache=" + Date.now(), { cache:"no-store" });
+  if(!r.ok) throw new Error("HTTP " + r.status);
+  const txt = await r.text();
+  // Poistka proti prihlasovacím stránkam operátora a chybovým hláškam:
+  // ak to nevyzerá ako naša appka, radšej neveríme ničomu.
+  if(!txt.includes("cennik-shell") && !txt.includes("APP_VERSION")) throw new Error("neznámy obsah");
+  const m = txt.match(/APP_VERSION\s*=\s*"([^"]+)"/);
+  if(!m) throw new Error("verzia sa nenašla");
+  return { version:m[1], text:txt };
+}
 async function checkUpdate(force){
   if(!navigator.onLine) return;
   if(!force && Date.now() - _updLast < 600000) return;   // najviac raz za 10 minút
   _updLast = Date.now();
   try{
-    const r = await fetch("index.html?nocache=" + Date.now(), { cache:"no-store" });
-    if(!r.ok) return;
-    const m = (await r.text()).match(/APP_VERSION\s*=\s*"([^"]+)"/);
-    if(!m) return;
-    if(m[1] !== APP_VERSION && m[1] !== _updSeen){
-      _updSeen = m[1];
-      el("updTxt").textContent = "Je dostupná verzia " + m[1];
-      el("updBar").hidden = false;
-    }
+    const { version } = await fetchFresh();
+    if(version === APP_VERSION){ el("updBar").hidden = true; return; }
+    // Po pokuse o aktualizáciu dáme sieti 15 minút pokoj — GitHub Pages
+    // rozposiela nový súbor postupne a dovtedy by pruh otravoval zbytočne.
+    if(_updTried && _updTried.version === version && Date.now() - _updTried.at < 900000) return;
+    if(version === _updSeen && !el("updBar").hidden) return;
+    _updSeen = version;
+    el("updTxt").textContent = `Nová verzia ${version} · beží ${APP_VERSION}`;
+    el("updBar").hidden = false;
   }catch(e){}
 }
 async function applyUpdate(){
   el("updTxt").textContent = "Sťahujem…";
+  let ok = false;
   try{
-    const keys = await caches.keys();
-    await Promise.all(keys.map(k => caches.delete(k)));
+    const fresh = await fetchFresh();
+    _updTried = { version:fresh.version, at:Date.now() };
+    await DB.put("meta", { id:"updTried", value:_updTried });
+    // Nový súbor uložíme rovno do cache pod všetky adresy, cez ktoré sa
+    // appka otvára. Bez tohto by sa po reštarte znova načítala stará kópia.
+    if(window.caches){
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+      const c = await caches.open(SHELL_CACHE);
+      const mk = () => new Response(fresh.text, { headers:{ "Content-Type":"text/html; charset=utf-8" } });
+      for(const u of ["./", "./index.html", location.pathname]){
+        try{ await c.put(new Request(u), mk()); }catch(e){}
+      }
+    }
     const reg = await navigator.serviceWorker.getRegistration();
     if(reg) await reg.update();
-  }catch(e){}
-  location.reload();
+    ok = true;
+  }catch(e){
+    el("updTxt").textContent = "Nepodarilo sa stiahnuť — skús o chvíľu";
+    setTimeout(()=>{ el("updBar").hidden = true; }, 4000);
+  }
+  if(ok) location.reload();
 }
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
   window.addEventListener("load", () => {
@@ -1394,6 +1426,7 @@ el("btnList").onclick = () => go({name: S.route.name==="list" ? "home" : "list"}
   }
   const meta = await DB.all("meta");
   const ls = meta.find(m=>m.id==="lastStore"); if(ls) S.lastStore = ls.value;
+  const ut = meta.find(m=>m.id==="updTried"); if(ut) _updTried = ut.value;
   await loadSyncCfg();
   render();
   setSync(SYNC.cfg.token && SYNC.cfg.gistId ? "idle" : "off");
