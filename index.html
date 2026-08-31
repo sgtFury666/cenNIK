@@ -265,6 +265,13 @@ main{flex:1;padding:14px 16px calc(96px + var(--safe-b))}
 }
 .note{font-size:12px;color:var(--ink-70);margin:6px 0 0}
 
+.updbar{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin:0 16px;margin-top:12px;padding:9px 12px;
+  background:var(--ink);color:#fff;border-radius:var(--r);font-size:13px;font-weight:600;
+}
+.updbar .btn{border-color:#fff;background:#fff;color:var(--ink);padding:6px 11px}
+
 /* ---------- sync ---------- */
 .syncbtn{
   display:flex;align-items:center;gap:6px;padding:5px 9px;border-radius:100px;
@@ -310,6 +317,10 @@ main{flex:1;padding:14px 16px calc(96px + var(--safe-b))}
       </button>
     </div>
   </header>
+  <div class="updbar" id="updBar" hidden>
+    <span id="updTxt">Je dostupná novšia verzia</span>
+    <button class="btn sm" onclick="applyUpdate()">Aktualizovať</button>
+  </div>
   <main id="view"></main>
 </div>
 
@@ -990,6 +1001,8 @@ async function deleteProduct(id){
 function sheetData(){
   openSheet(`<h2>Dáta</h2>
     <p class="note" style="margin-bottom:14px">${S.articles.length} artiklov · ${S.products.length} produktov · ${S.prices.length} zápisov cien${DB.isMemory()?" · <b>bez trvalého ukladania</b>":""}</p>
+    <div class="kv" style="margin-bottom:14px"><span>Verzia appky</span>
+      <b class="num">${APP_VERSION}${("serviceWorker" in navigator && navigator.serviceWorker.controller)?" · offline pripravené":""}</b></div>
     <div class="field"><label class="eyebrow">Zariadenia</label>
       <button class="btn block" onclick="sheetSync()">${SYNC.cfg.gistId?"Synchronizácia — prepojené":"Prepojiť telefón a počítač"}</button>
       <p class="note">Zápisy z oboch zariadení sa zlúčia. Zariadenie offline sa dorovná, keď chytí sieť.</p></div>
@@ -1111,6 +1124,48 @@ async function loadSample(){
   for(const x of prices){ S.prices.push(x); await saveRec("prices", x, true); }
   scheduleSync();
   closeSheet(); go({name:"home"}); toast("Ukážkové dáta vložené");
+}
+
+/* ============================================================
+   7a. VERZIA A AKTUALIZÁCIE
+   ------------------------------------------------------------
+   Appka si pri štarte stiahne vlastný súbor zo servera (mimo cache)
+   a porovná číslo verzie s tým, ktoré práve beží. Ak sa líši,
+   ponúkne aktualizáciu — nič sa nedeje na pozadí bez tvojho vedomia.
+   ============================================================ */
+const APP_VERSION = "1.4";
+let _updSeen = "", _updLast = 0;
+
+async function checkUpdate(force){
+  if(!navigator.onLine) return;
+  if(!force && Date.now() - _updLast < 600000) return;   // najviac raz za 10 minút
+  _updLast = Date.now();
+  try{
+    const r = await fetch("index.html?nocache=" + Date.now(), { cache:"no-store" });
+    if(!r.ok) return;
+    const m = (await r.text()).match(/APP_VERSION\s*=\s*"([^"]+)"/);
+    if(!m) return;
+    if(m[1] !== APP_VERSION && m[1] !== _updSeen){
+      _updSeen = m[1];
+      el("updTxt").textContent = "Je dostupná verzia " + m[1];
+      el("updBar").hidden = false;
+    }
+  }catch(e){}
+}
+async function applyUpdate(){
+  el("updTxt").textContent = "Sťahujem…";
+  try{
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+    const reg = await navigator.serviceWorker.getRegistration();
+    if(reg) await reg.update();
+  }catch(e){}
+  location.reload();
+}
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
 }
 
 /* ============================================================
@@ -1343,11 +1398,12 @@ el("btnList").onclick = () => go({name: S.route.name==="list" ? "home" : "list"}
   render();
   setSync(SYNC.cfg.token && SYNC.cfg.gistId ? "idle" : "off");
   doSync();
+  setTimeout(() => checkUpdate(true), 3000);
 })();
 
 /* zosúladenie pri návrate k appke, po prebudení siete a raz za 5 minút */
-document.addEventListener("visibilitychange", () => { if(!document.hidden) doSync(); });
-window.addEventListener("online",  () => doSync());
+document.addEventListener("visibilitychange", () => { if(!document.hidden){ doSync(); checkUpdate(); } });
+window.addEventListener("online",  () => { doSync(); checkUpdate(true); });
 window.addEventListener("offline", () => setSync("offline"));
 setInterval(() => { if(!document.hidden) doSync(); }, 300000);
 setInterval(() => { if(SYNC.state==="idle") setSync("idle"); }, 60000);
