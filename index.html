@@ -1135,7 +1135,7 @@ async function loadSample(){
    a porovná číslo verzie s tým, ktoré práve beží. Ak sa líši,
    ponúkne aktualizáciu — nič sa nedeje na pozadí bez tvojho vedomia.
    ============================================================ */
-const APP_VERSION = "1.5";
+const APP_VERSION = "1.6";
 const SHELL_CACHE = "cennik-shell-v1";
 let _updSeen = "", _updLast = 0, _updTried = null;
 
@@ -1151,13 +1151,24 @@ async function fetchFresh(){
   if(!m) throw new Error("verzia sa nenašla");
   return { version:m[1], text:txt };
 }
+/** Porovná čísla verzií (1.10 je novšia ako 1.9). Vracia -1 / 0 / 1. */
+function cmpVersion(a, b){
+  const A = String(a).split("."), B = String(b).split(".");
+  for(let i = 0; i < Math.max(A.length, B.length); i++){
+    const x = parseInt(A[i] || "0", 10) || 0, y = parseInt(B[i] || "0", 10) || 0;
+    if(x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
 async function checkUpdate(force){
   if(!navigator.onLine) return;
   if(!force && Date.now() - _updLast < 600000) return;   // najviac raz za 10 minút
   _updLast = Date.now();
   try{
     const { version } = await fetchFresh();
-    if(version === APP_VERSION){ el("updBar").hidden = true; return; }
+    // Ponúkame len skutočne novšiu verziu. Server môže chvíľu po nahratí
+    // rozposielať ešte starý súbor — vtedy nemá zmysel nič robiť.
+    if(cmpVersion(version, APP_VERSION) <= 0){ el("updBar").hidden = true; return; }
     // Po pokuse o aktualizáciu dáme sieti 15 minút pokoj — GitHub Pages
     // rozposiela nový súbor postupne a dovtedy by pruh otravoval zbytočne.
     if(_updTried && _updTried.version === version && Date.now() - _updTried.at < 900000) return;
