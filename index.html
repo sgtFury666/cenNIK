@@ -454,11 +454,14 @@ function evaluate(prodId){
   if(!rows.length) return { state:"empty" };
 
   const current = rows[0];
-  const cu = unitPrice(current.price, current.packSize || p.packSize, p.packUnit);
+  const up = r => unitPrice(r.price, r.packSize || p.packSize, p.packUnit);
+  const cu = up(current);
 
-  const hist = rows.slice(1).filter(r => daysAgo(r.date) <= WINDOW_DAYS);
-  const vals = hist.map(r => unitPrice(r.price, r.packSize || p.packSize, p.packUnit)).filter(v=>v!=null);
-  const n = vals.length;
+  // Do hodnotenia vstupujú zápisy za posledný rok — vrátane toho aktuálneho.
+  const win = rows.filter(r => daysAgo(r.date) <= WINDOW_DAYS && up(r) != null);
+  const outside = rows.length - win.length;      // staršie zápisy, ktoré sa nerátajú
+  const n = win.length;
+  const vals = win.filter(r => r.id !== current.id).map(up);
 
   const regular = rows.filter(r=>!r.promo).map(r=>unitPrice(r.price, r.packSize||p.packSize, p.packUnit)).filter(v=>v!=null).sort((a,b)=>a-b);
   const promos  = rows.filter(r=> r.promo).map(r=>unitPrice(r.price, r.packSize||p.packSize, p.packUnit)).filter(v=>v!=null).sort((a,b)=>a-b);
@@ -468,11 +471,11 @@ function evaluate(prodId){
     allTimeLow: Math.min(...[...regular,...promos,cu].filter(v=>v!=null)),
   };
 
-  if(n < 3) return { state:"learning", current, cu, n, need:3-n, refs };
+  if(n < 3 || vals.length < 2) return { state:"learning", current, cu, n, need:Math.max(1, 3-n), outside, refs };
 
   const sorted = [...vals].sort((a,b)=>a-b);
   const below = vals.filter(v => v < cu).length;
-  const pct = Math.round(below / n * 100);
+  const pct = Math.round(below / vals.length * 100);
   const p25 = quantile(sorted,.25), p60 = quantile(sorted,.60);
 
   let level, title, sub;
@@ -481,7 +484,7 @@ function evaluate(prodId){
   else { level="bad"; title="Počkaj"; sub="Býva to lacnejšie"; }
 
   const confidence = n >= 7 ? "strong" : "weak";
-  return { state:"ok", current, cu, n, pct, p25, p60, min:sorted[0], max:sorted[sorted.length-1],
+  return { state:"ok", current, cu, n, outside, pct, p25, p60, min:sorted[0], max:sorted[sorted.length-1],
            level, title, sub, confidence, refs };
 }
 
@@ -653,6 +656,10 @@ function viewProduct(id){
   <div style="height:20px"></div>`;
 }
 
+function olderNote(ev){
+  if(!ev.outside) return "";
+  return ` — ${ev.outside} ${ev.outside===1?"zápis je starší":"zápisy sú staršie"} ako rok a do hodnotenia sa nerátajú`;
+}
 function cenovka(p, ev){
   const a = article(p.articleId)||{};
   const head = `<div class="cv-top">
@@ -679,7 +686,7 @@ function cenovka(p, ev){
   if(ev.state==="learning"){
     return `<div class="cenovka">${priceBlock}
       <div class="verdict v-none"><div><div class="verdict-t">Zbieram dáta</div>
-        <div class="verdict-s">Ešte ${ev.need} ${ev.need===1?"zápis":"zápisy"} a začnem hodnotiť</div></div>
+        <div class="verdict-s">Ešte ${ev.need} ${ev.need===1?"zápis":"zápisy"} a začnem hodnotiť${olderNote(ev)}</div></div>
         <div class="v-pct num">${ev.n}/3</div></div></div>`;
   }
   const lo = Math.min(ev.min, ev.cu), hi = Math.max(ev.max, ev.cu);
@@ -697,7 +704,7 @@ function cenovka(p, ev){
         <div class="scale-mark" style="left:calc(${me}% - 1.5px)"></div>
       </div>
       <div class="scale-legend num"><span>${fmtEur(lo)}</span>
-        <span style="color:var(--ink-40)">${ev.n} ${ev.n<5?"zápisov":"zápisov"} za rok${ev.confidence==="weak"?" · slabý signál":""}</span>
+        <span style="color:var(--ink-40)">${ev.n} ${ev.n===1?"zápis":ev.n<5?"zápisy":"zápisov"} za rok${ev.outside?" · "+ev.outside+" "+(ev.outside===1?"starší":ev.outside<5?"staršie":"starších"):""}${ev.confidence==="weak"?" · slabý signál":""}</span>
         <span>${fmtEur(hi)}</span></div>
     </div>
     <div class="verdict ${vcls}"><div><div class="verdict-t">${ev.title}</div>
@@ -764,11 +771,21 @@ async function delPrice(id){
 }
 
 /* ---------- sheet: zápis ceny ---------- */
-const STORES_DEF = ["Lidl","Kaufland","Tesco","Billa","Coop Jednota","Terno","Metro","DM","Rossmann","iné"];
+const STORES_DEF = ["Lidl","Kaufland","Tesco","Billa","COOP Jednota","Terno","Yeme","Fresh","Metro","dm","Rossmann","Teta"];
+/* Ponuka obchodov: najprv tie, ktoré naozaj používaš (podľa počtu zápisov),
+   potom zvyšok predvolených. Vlastný obchod sa uloží tým, že ho použiješ. */
+function storeList(){
+  const freq = {};
+  S.prices.forEach(x => { if(x.store) freq[x.store] = (freq[x.store]||0) + 1; });
+  const used = Object.keys(freq).sort((a,b) => freq[b]-freq[a]);
+  const low  = used.map(u => u.toLowerCase());
+  const rest = STORES_DEF.filter(s => !low.includes(s.toLowerCase()));
+  return [...used, ...rest].slice(0,16);
+}
 function sheetAddPrice(id){
   const p = product(id);
   _promo = false;
-  const stores = [...new Set([...S.prices.map(x=>x.store).filter(Boolean), ...STORES_DEF])].slice(0,12);
+  const stores = storeList();
   openSheet(`
     <h2>${esc(productTitle(p))}</h2>
     <div class="field"><label class="eyebrow">Cena na cenovke</label>
@@ -779,7 +796,10 @@ function sheetAddPrice(id){
         <input class="input" value="${esc(p.packUnit)}" disabled></div>
       <p class="note">Ak sa balenie zmenšilo, prepíš to — jednotková cena to zachytí.</p></div>
     <div class="field"><label class="eyebrow">Obchod</label>
-      <div class="chips" id="f_stores">${stores.map(s=>`<button class="chip ${s===S.lastStore?"on":""}" data-s="${esc(s)}" onclick="pickStore(this)">${esc(s)}</button>`).join("")}</div></div>
+      <div class="chips" id="f_stores">${stores.map(s=>`<button class="chip ${s===S.lastStore?"on":""}" data-s="${esc(s)}" onclick="pickStore(this)">${esc(s)}</button>`).join("")}<button class="chip" id="f_addstore" onclick="showStoreInput()">＋ Iný</button></div>
+      <div id="f_custom" hidden style="display:flex;gap:6px;margin-top:6px">
+        <input class="input" id="f_storenew" placeholder="Názov obchodu" autocomplete="off" enterkeyhint="done">
+        <button class="btn sm" onclick="addStore()">Pridaj</button></div></div>
     <div class="field"><label class="eyebrow">Typ ceny</label>
       <div class="seg"><button id="f_reg" class="on" onclick="setPromo(false)">Bežná</button>
         <button id="f_pro" onclick="setPromo(true)">Akcia / klubová</button></div></div>
@@ -792,12 +812,38 @@ function sheetAddPrice(id){
 let _promo = false;
 function setPromo(v){ _promo=v; el("f_reg").classList.toggle("on",!v); el("f_pro").classList.toggle("on",v); }
 function pickStore(btn){ [...el("f_stores").children].forEach(c=>c.classList.remove("on")); btn.classList.add("on"); }
+function showStoreInput(){
+  el("f_custom").hidden = false;
+  el("f_addstore").hidden = true;
+  const i = el("f_storenew");
+  i.focus();
+  i.onkeydown = e => { if(e.key==="Enter"){ e.preventDefault(); addStore(); } };
+}
+function addStore(){
+  const raw = el("f_storenew").value.trim().replace(/\s+/g," ");
+  if(!raw){ el("f_storenew").focus(); return; }
+  const box = el("f_stores");
+  // ak už taký obchod existuje (bez ohľadu na veľkosť písmen), použi jeho pôvodný zápis
+  const existing = [...box.querySelectorAll(".chip[data-s]")]
+    .find(c => c.dataset.s.toLowerCase() === raw.toLowerCase());
+  if(existing){ pickStore(existing); }
+  else {
+    const b = document.createElement("button");
+    b.className = "chip"; b.dataset.s = raw; b.textContent = raw;
+    b.onclick = () => pickStore(b);
+    box.insertBefore(b, el("f_addstore"));
+    pickStore(b);
+  }
+  el("f_storenew").value = "";
+  el("f_custom").hidden = true;
+  el("f_addstore").hidden = false;
+}
 async function savePrice(id){
   const p = product(id);
   const price = parseNum(el("f_price").value);
   if(price==null || price<=0){ toast("Zadaj cenu"); el("f_price").focus(); return; }
   const pack = parseNum(el("f_pack").value) || p.packSize;
-  const storeBtn = el("f_stores").querySelector(".chip.on");
+  const storeBtn = el("f_stores").querySelector(".chip.on[data-s]");
   const store = storeBtn ? storeBtn.dataset.s : "";
   const rec = { id:uid(), productId:id, date:el("f_date").value||todayISO(), store, price, packSize:pack, promo:_promo, note:"", createdAt:Date.now() };
   S.prices.push(rec); await saveRec("prices", rec, true);
