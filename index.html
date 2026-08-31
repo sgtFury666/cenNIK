@@ -34,6 +34,8 @@
   --safe-b:env(safe-area-inset-bottom,0px);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* Atribút hidden musí platiť aj tam, kde trieda alebo inline štýl nastavuje display. */
+[hidden]{display:none!important}
 html,body{margin:0;padding:0}
 body{
   font-family:var(--sans);
@@ -271,6 +273,7 @@ main{flex:1;padding:14px 16px calc(96px + var(--safe-b))}
   background:var(--ink);color:#fff;border-radius:var(--r);font-size:13px;font-weight:600;
 }
 .updbar .btn{border-color:#fff;background:#fff;color:var(--ink);padding:6px 11px}
+.storerow{display:flex;gap:6px;margin-top:6px}
 
 /* ---------- sync ---------- */
 .syncbtn{
@@ -808,7 +811,7 @@ function sheetAddPrice(id){
       <p class="note">Ak sa balenie zmenšilo, prepíš to — jednotková cena to zachytí.</p></div>
     <div class="field"><label class="eyebrow">Obchod</label>
       <div class="chips" id="f_stores">${stores.map(s=>`<button class="chip ${s===S.lastStore?"on":""}" data-s="${esc(s)}" onclick="pickStore(this)">${esc(s)}</button>`).join("")}<button class="chip" id="f_addstore" onclick="showStoreInput()">＋ Iný</button></div>
-      <div id="f_custom" hidden style="display:flex;gap:6px;margin-top:6px">
+      <div id="f_custom" class="storerow" hidden>
         <input class="input" id="f_storenew" placeholder="Názov obchodu" autocomplete="off" enterkeyhint="done">
         <button class="btn sm" onclick="addStore()">Pridaj</button></div></div>
     <div class="field"><label class="eyebrow">Typ ceny</label>
@@ -1135,7 +1138,7 @@ async function loadSample(){
    a porovná číslo verzie s tým, ktoré práve beží. Ak sa líši,
    ponúkne aktualizáciu — nič sa nedeje na pozadí bez tvojho vedomia.
    ============================================================ */
-const APP_VERSION = "1.6";
+const APP_VERSION = "1.7";
 const SHELL_CACHE = "cennik-shell-v1";
 let _updSeen = "", _updLast = 0, _updTried = null;
 
