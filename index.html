@@ -101,15 +101,18 @@ main{flex:1;padding:14px 16px calc(96px + var(--safe-b))}
 .row-main{flex:1;min-width:0}
 .row-title{font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row-sub{font-size:12px;color:var(--ink-70);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.row-right{text-align:right;flex-shrink:0}
+.row-right{text-align:right;flex-shrink:0;white-space:nowrap;min-width:0}
 .row-price{font-weight:700;font-size:15px}
 .row-unit{font-size:11px;color:var(--ink-70);margin-top:1px}
+.row-main>*{display:block}
 .stale{opacity:.45}
 
 .pill{
   display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:2px;
   font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  flex-shrink:0;white-space:nowrap;vertical-align:middle;
 }
+.pill.tiny{font-size:9px;padding:1px 4px;letter-spacing:.04em}
 .pill.promo{background:var(--promo);color:#3A3000}
 .pill.good{background:var(--good-bg);color:var(--good)}
 .pill.mid{background:var(--mid-bg);color:var(--mid)}
@@ -234,7 +237,8 @@ main{flex:1;padding:14px 16px calc(96px + var(--safe-b))}
 
 /* ---------- history ---------- */
 .hist{background:var(--card);border:1px solid var(--hair);border-radius:var(--r);overflow:hidden}
-.hitem{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--hair);font-size:13.5px}
+.hitem{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--hair);font-size:13.5px;width:100%;text-align:left;background:none}
+.hitem:active{background:#00000005}
 .hitem:last-child{border-bottom:none}
 .hdate{width:74px;flex-shrink:0;color:var(--ink-70);font-size:12px}
 .hstore{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-70);font-size:12.5px}
@@ -274,6 +278,7 @@ main{flex:1;padding:14px 16px calc(96px + var(--safe-b))}
 }
 .updbar .btn{border-color:#fff;background:#fff;color:var(--ink);padding:6px 11px}
 .storerow{display:flex;gap:6px;margin-top:6px}
+textarea.input{resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.5}
 
 /* ---------- sync ---------- */
 .syncbtn{
@@ -568,7 +573,7 @@ function viewHome(){
       <button class="btn sm ghost" onclick="go({name:'list'})">Otvoriť</button></div><div class="hr"></div>
       ${onList.slice(0,4).map(p=>rowProduct(p)).join("")}</div>` : ""}
   <div class="section"><div class="section-head"><span class="eyebrow">Naposledy zapísané</span></div><div class="hr"></div>
-    <div class="tiles">${recent.map(x=>tile(x.p)).join("")}</div></div>
+    ${recent.map(x=>rowProduct(x.p)).join("")}</div>
   <div class="section"><div class="section-head"><span class="eyebrow">Kupuješ najčastejšie</span></div><div class="hr"></div>
     ${freq.map(p=>rowProduct(p)).join("")}</div>`;
 }
@@ -581,17 +586,23 @@ function rowProduct(p){
   const last = ev && ev.current;
   const u = last ? unitPrice(last.price, last.packSize||p.packSize, p.packUnit) : null;
   const stale = last && daysAgo(last.date) > STALE_DAYS;
-  const pill = ev && ev.state==="ok" ? `<span class="pill ${ev.level}">${ev.pct}%</span>` : "";
+  // Odznaky patria do druhého riadku, kde je miesto — v názve by pretekali.
+  const marks = [
+    ev && ev.state==="ok" ? `<span class="pill tiny ${ev.level}">${ev.pct}%</span>` : "",
+    last && last.promo ? '<span class="pill tiny promo">akcia</span>' : ""
+  ].filter(Boolean).join(" ");
+  const sub = [ (article(p.articleId)||{}).name, packLabel(p), last ? fmtAge(last.date) : "bez ceny" ]
+    .filter(Boolean).map(esc).join(" · ");
   return `<button class="row ${stale?"stale":""}" onclick="go({name:'product',id:'${p.id}'})">
     ${p.photo?`<img class="photo" src="${p.photo}" alt="">`:""}
     <span class="row-main">
-      <span class="row-title">${esc(productTitle(p))} ${last&&last.promo?'<span class="pill promo">akcia</span>':""}</span>
-      <span class="row-sub">${esc((article(p.articleId)||{}).name||"")} · ${esc(packLabel(p))}${last?" · "+fmtAge(last.date):" · bez ceny"}</span>
+      <span class="row-title">${esc(productTitle(p))}</span>
+      <span class="row-sub">${marks?marks+" ":""}${sub}</span>
     </span>
     <span class="row-right">
       <span class="row-price num">${last?fmtEur(last.price):"—"}</span>
       <span class="row-unit num">${u!=null?fmtEur(u)+"/"+baseLabel(p.packUnit):""}</span>
-    </span>${pill}</button>`;
+    </span></button>`;
 }
 function tile(p){
   const last = pricesOf(p.id)[0];
@@ -749,13 +760,12 @@ function rankRow(r, i, best, currentId){
 
 function histRow(p, r){
   const u = unitPrice(r.price, r.packSize||p.packSize, p.packUnit);
-  return `<div class="hitem">
+  return `<button class="hitem" onclick="sheetEditPrice('${r.id}')">
     <span class="hdate num">${fmtDate(r.date)}</span>
-    <span class="hstore">${esc(r.store||"—")}${r.promo?' <span class="pill promo">A</span>':""}${r.note?" · "+esc(r.note):""}</span>
+    <span class="hstore">${esc(r.store||"—")}${r.promo?' <span class="pill tiny promo">A</span>':""}${r.batch?' <span class="pill tiny flat">import</span>':""}${r.note?" · "+esc(r.note):""}</span>
     <span class="hprice num">${fmtEur(r.price)}</span>
     <span class="hunit num">${u!=null?fmtEur(u)+"/"+baseLabel(p.packUnit):""}</span>
-    <button class="icon-btn" style="width:26px;height:26px" onclick="delPrice('${r.id}')" aria-label="Zmazať zápis">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>`;
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-40)" stroke-width="2.2" stroke-linecap="round" style="flex-shrink:0"><path d="M9 6l6 6-6 6"/></svg></button>`;
 }
 
 function sparkline(p, rows){
@@ -781,7 +791,7 @@ async function toggleList(id){
 }
 async function delPrice(id){
   if(!confirm("Zmazať tento zápis ceny?")) return;
-  await killRec("prices", id); render(); toast("Zápis zmazaný");
+  await killRec("prices", id); closeSheet(); render(); toast("Zápis zmazaný");
 }
 
 /* ---------- sheet: zápis ceny ---------- */
@@ -796,32 +806,43 @@ function storeList(){
   const rest = STORES_DEF.filter(s => !low.includes(s.toLowerCase()));
   return [...used, ...rest].slice(0,16);
 }
-function sheetAddPrice(id){
+function sheetAddPrice(id){ sheetPriceForm(id, null); }
+function sheetEditPrice(priceId){
+  const r = S.prices.find(x => x.id === priceId);
+  if(r) sheetPriceForm(r.productId, priceId);
+}
+function sheetPriceForm(id, priceId){
   const p = product(id);
-  _promo = false;
+  const rec = priceId ? S.prices.find(x => x.id === priceId) : null;
+  _promo = rec ? !!rec.promo : false;
   const stores = storeList();
+  const curStore = rec ? rec.store : S.lastStore;
   openSheet(`
-    <h2>${esc(productTitle(p))}</h2>
+    <h2>${rec ? "Upraviť zápis" : esc(productTitle(p))}</h2>
+    ${rec ? `<p class="note" style="margin:0 0 12px">${esc(productTitle(p))}</p>` : ""}
     <div class="field"><label class="eyebrow">Cena na cenovke</label>
-      <input class="input bigprice num" id="f_price" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off"></div>
+      <input class="input bigprice num" id="f_price" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off" value="${rec ? String(rec.price).replace(".",",") : ""}"></div>
     <div class="field"><label class="eyebrow">Veľkosť balenia — over na obale</label>
       <div class="grid2">
-        <input class="input num" id="f_pack" type="text" inputmode="decimal" value="${p.packSize||""}">
+        <input class="input num" id="f_pack" type="text" inputmode="decimal" value="${(rec ? rec.packSize : p.packSize)||""}">
         <input class="input" value="${esc(p.packUnit)}" disabled></div>
       <p class="note">Ak sa balenie zmenšilo, prepíš to — jednotková cena to zachytí.</p></div>
     <div class="field"><label class="eyebrow">Obchod</label>
-      <div class="chips" id="f_stores">${stores.map(s=>`<button class="chip ${s===S.lastStore?"on":""}" data-s="${esc(s)}" onclick="pickStore(this)">${esc(s)}</button>`).join("")}<button class="chip" id="f_addstore" onclick="showStoreInput()">＋ Iný</button></div>
+      <div class="chips" id="f_stores">${[...new Set([...(curStore?[curStore]:[]), ...stores])].map(s=>`<button class="chip ${s===curStore?"on":""}" data-s="${esc(s)}" onclick="pickStore(this)">${esc(s)}</button>`).join("")}<button class="chip" id="f_addstore" onclick="showStoreInput()">＋ Iný</button></div>
       <div id="f_custom" class="storerow" hidden>
         <input class="input" id="f_storenew" placeholder="Názov obchodu" autocomplete="off" enterkeyhint="done">
         <button class="btn sm" onclick="addStore()">Pridaj</button></div></div>
     <div class="field"><label class="eyebrow">Typ ceny</label>
-      <div class="seg"><button id="f_reg" class="on" onclick="setPromo(false)">Bežná</button>
-        <button id="f_pro" onclick="setPromo(true)">Akcia / klubová</button></div></div>
+      <div class="seg"><button id="f_reg" class="${_promo?"":"on"}" onclick="setPromo(false)">Bežná</button>
+        <button id="f_pro" class="${_promo?"on":""}" onclick="setPromo(true)">Akcia / klubová</button></div></div>
     <div class="field"><label class="eyebrow">Dátum</label>
-      <input class="input" id="f_date" type="date" value="${todayISO()}"></div>
+      <input class="input" id="f_date" type="date" value="${rec ? rec.date : todayISO()}"></div>
+    <div class="field"><label class="eyebrow">Poznámka</label>
+      <input class="input" id="f_note" value="${esc(rec ? (rec.note||"") : "")}" placeholder="nepovinné"></div>
     <div class="btnbar"><button class="btn ghost" onclick="closeSheet()">Zruš</button>
-      <button class="btn primary" style="flex:1" onclick="savePrice('${id}')">Ulož cenu</button></div>`);
-  setTimeout(()=>el("f_price").focus(),260);
+      <button class="btn primary" style="flex:1" onclick="savePrice('${id}'${rec?",'"+rec.id+"'":""})">${rec?"Ulož zmeny":"Ulož cenu"}</button></div>
+    ${rec ? `<button class="btn block" style="margin-top:8px;border-color:var(--bad);color:var(--bad)" onclick="delPrice('${rec.id}')">Zmazať zápis</button>` : ""}`);
+  if(!rec) setTimeout(()=>el("f_price").focus(),260);
 }
 let _promo = false;
 function setPromo(v){ _promo=v; el("f_reg").classList.toggle("on",!v); el("f_pro").classList.toggle("on",v); }
@@ -852,19 +873,24 @@ function addStore(){
   el("f_custom").hidden = true;
   el("f_addstore").hidden = false;
 }
-async function savePrice(id){
+async function savePrice(id, priceId){
   const p = product(id);
   const price = parseNum(el("f_price").value);
   if(price==null || price<=0){ toast("Zadaj cenu"); el("f_price").focus(); return; }
   const pack = parseNum(el("f_pack").value) || p.packSize;
   const storeBtn = el("f_stores").querySelector(".chip.on[data-s]");
   const store = storeBtn ? storeBtn.dataset.s : "";
-  const rec = { id:uid(), productId:id, date:el("f_date").value||todayISO(), store, price, packSize:pack, promo:_promo, note:"", createdAt:Date.now() };
-  S.prices.push(rec); await saveRec("prices", rec, true);
-  if(pack !== p.packSize){ p.packSize = pack; await saveRec("products", p, true); }
+  const note = el("f_note") ? el("f_note").value.trim() : "";
+  const existing = priceId ? S.prices.find(x => x.id === priceId) : null;
+  const rec = existing || { id:uid(), productId:id, createdAt:Date.now() };
+  Object.assign(rec, { date: el("f_date").value||todayISO(), store, price, packSize:pack, promo:_promo, note });
+  if(!existing) S.prices.push(rec);
+  await saveRec("prices", rec, true);
+  if(!existing && pack !== p.packSize){ p.packSize = pack; await saveRec("products", p, true); }
   S.lastStore = store; await DB.put("meta",{id:"lastStore",value:store});
   scheduleSync();
   _promo=false; closeSheet(); render();
+  if(existing){ toast("Zápis upravený"); return; }
   const ev = evaluate(id);
   toast(ev && ev.state==="ok" ? `${ev.title} — ${ev.pct}. percentil` : "Cena uložená");
 }
@@ -891,6 +917,35 @@ function sheetArticles(){
         ${st.n === 0 ? '<span class="pill bad">prázdny</span>' : ""}</button>`;
     }).join("") : `<p class="note">Zatiaľ žiadne artikle.</p>`}`);
 }
+/* Kategória: ponuka z toho, čo už používaš, plus možnosť napísať vlastnú. */
+function categoryList(){
+  const set = new Set(S.articles.map(a => a.category).filter(Boolean));
+  ["Potraviny","Drogéria","Domácnosť","Nápoje","Mrazené","Chovateľské"].forEach(c => set.add(c));
+  return [...set].sort((a,b) => a.localeCompare(b,"sk"));
+}
+function categoryField(current, idPrefix){
+  const cats = categoryList();
+  const known = current && cats.some(c => c === current);
+  return `<div class="field"><label class="eyebrow">Kategória</label>
+    <select class="input" id="${idPrefix}_catsel" onchange="onCatChange('${idPrefix}')">
+      ${cats.map(c => `<option value="${esc(c)}" ${known && c===current ? "selected" : ""}>${esc(c)}</option>`).join("")}
+      <option value="__new" ${current && !known ? "selected" : ""}>＋ nová kategória…</option>
+    </select>
+    <input class="input" id="${idPrefix}_catnew" style="margin-top:6px" placeholder="Názov novej kategórie"
+      value="${esc(current && !known ? current : "")}" hidden></div>`;
+}
+function onCatChange(pre){
+  const isNew = el(pre+"_catsel").value === "__new";
+  el(pre+"_catnew").hidden = !isNew;
+  if(isNew) el(pre+"_catnew").focus();
+}
+function readCategory(pre){
+  const sel = el(pre+"_catsel");
+  if(!sel) return "Ostatné";
+  if(sel.value !== "__new") return sel.value;
+  return el(pre+"_catnew").value.trim() || "Ostatné";
+}
+
 let _aUnit = "g";
 function pickAUnit(b){ [...el("a_unit").children].forEach(c => c.classList.remove("on")); b.classList.add("on"); _aUnit = b.dataset.u; }
 
@@ -901,8 +956,7 @@ function sheetEditArticle(id){
   openSheet(`<h2>Upraviť artikel</h2>
     <div class="field"><label class="eyebrow">Názov</label>
       <input class="input" id="a_name" value="${esc(a.name)}"></div>
-    <div class="field"><label class="eyebrow">Kategória</label>
-      <input class="input" id="a_cat" value="${esc(a.category||"")}" placeholder="Potraviny / Drogéria / Domácnosť"></div>
+    ${categoryField(a.category, "a")}
     <div class="field"><label class="eyebrow">Merná jednotka</label>
       <div class="seg" id="a_unit">${units.map(([u,l]) =>
         `<button class="${a.unit===u?"on":""}" data-u="${u}" onclick="pickAUnit(this)">${l}</button>`).join("")}</div>
@@ -913,6 +967,7 @@ function sheetEditArticle(id){
       <button class="btn primary" style="flex:1" onclick="saveArticle('${id}')">Ulož</button></div>
     <button class="btn block" style="margin-top:8px;border-color:var(--bad);color:var(--bad)" onclick="deleteArticle('${id}')">Zmazať artikel</button>`);
   _aUnit = a.unit;
+  onCatChange("a");
 }
 async function saveArticle(id){
   const a = article(id); if(!a) return;
@@ -923,7 +978,7 @@ async function saveArticle(id){
   if(unitChanged && st.n && !confirm(
     `Zmeniť mernú jednotku na ${baseLabel(_aUnit)}?\n\nPrepíše sa u ${st.n} ${skloň(st.n,"produktu","produktov","produktov")} a všetky jednotkové ceny sa prepočítajú nanovo.`)) return;
   a.name = name;
-  a.category = el("a_cat").value.trim() || "Ostatné";
+  a.category = readCategory("a");
   a.unit = _aUnit;
   await saveRec("articles", a, true);
   if(unitChanged){
@@ -978,8 +1033,7 @@ function productForm(p, prefill="", articleId=""){
           <button class="on" data-u="g" onclick="pickUnit(this)">gramy → €/kg</button>
           <button data-u="ml" onclick="pickUnit(this)">ml → €/l</button>
           <button data-u="ks" onclick="pickUnit(this)">kusy → €/ks</button></div></div>
-      <div class="field"><label class="eyebrow">Kategória</label>
-        <input class="input" id="f_cat" placeholder="Drogéria / Potraviny / Domácnosť" value="Potraviny"></div>
+      ${categoryField("Potraviny", "f")}
     </div>
     <div class="grid2">
       <div class="field"><label class="eyebrow">Značka</label>
@@ -1006,6 +1060,7 @@ function productForm(p, prefill="", articleId=""){
       <button class="btn primary" style="flex:1" onclick="saveProduct('${p?p.id:""}')">${isNew?"Vytvor a zapíš cenu":"Ulož"}</button></div>`);
   _photo = p ? p.photo : null; _unit = "g";
   onArtChange();
+  onCatChange("f");
   if("BarcodeDetector" in window) el("f_scan").hidden = false;
 }
 let _photo = null, _unit = "g";
@@ -1056,7 +1111,7 @@ async function saveProduct(id){
   if(artId==="__new"){
     const nm = el("f_artname").value.trim();
     if(!nm){ toast("Zadaj názov artikla"); return; }
-    const a = { id:uid(), name:nm, unit:_unit, category:(el("f_cat").value||"Ostatné").trim() };
+    const a = { id:uid(), name:nm, unit:_unit, category:readCategory("f") };
     S.articles.push(a); await saveRec("articles", a, true); artId = a.id;
   }
   const a = article(artId);
@@ -1100,15 +1155,18 @@ function sheetData(){
     <div class="field"><label class="eyebrow">Zariadenia</label>
       <button class="btn block" onclick="sheetSync()">${SYNC.cfg.gistId?"Synchronizácia — prepojené":"Prepojiť telefón a počítač"}</button>
       <p class="note">Zápisy z oboch zariadení sa zlúčia. Zariadenie offline sa dorovná, keď chytí sieť.</p></div>
-    <div class="field"><label class="eyebrow">Analytika doma</label>
-      <button class="btn block" onclick="exportXlsx()">Stiahni Excel (.xlsx)</button>
-      <p class="note">Tri hárky: Artikle, Produkty, Ceny — vrátane dopočítanej jednotkovej ceny. Potrebuje internet pri prvom exporte.</p></div>
-    <div class="field"><label class="eyebrow">Záloha a prenos medzi zariadeniami</label>
+    <div class="field"><label class="eyebrow">Export</label>
       <div class="grid2">
-        <button class="btn" onclick="exportJson()">Ulož zálohu</button>
-        <button class="btn" onclick="document.getElementById('f_import').click()">Načítaj zálohu</button></div>
+        <button class="btn" onclick="exportJson()">Stiahni JSON</button>
+        <button class="btn" onclick="exportXlsx()">Stiahni Excel</button></div>
+      <p class="note">JSON je úplná kópia databázy vrátane fotiek, funguje offline a dá sa načítať späť. Excel má tri hárky s dopočítanou jednotkovou cenou a je len na čítanie — pri prvom exporte potrebuje internet.</p></div>
+    <div class="field"><label class="eyebrow">Import</label>
+      <div class="grid2">
+        <button class="btn" onclick="sheetImportBatch()">Dávkovo z textu</button>
+        <button class="btn" onclick="document.getElementById('f_import').click()">Načítaj JSON</button></div>
       <input id="f_import" type="file" accept=".json" hidden onchange="importJson(this)">
-      <p class="note">Záloha funguje aj offline a obsahuje všetko vrátane fotiek.</p></div>
+      <button class="btn ghost block" style="margin-top:6px" onclick="sheetBatches()">Dávkové importy · ${batchList().length}</button>
+      <p class="note">Dávkový import ukáže náhľad pred zápisom a dá sa celý vrátiť späť.</p></div>
     <div class="field"><label class="eyebrow">Ostatné</label>
       <div class="grid2">
         <button class="btn ghost" onclick="loadSample()">Ukážkové dáta</button>
@@ -1119,7 +1177,7 @@ function download(blob, name){
   a.href = u; a.download = name; a.click(); setTimeout(()=>URL.revokeObjectURL(u), 1500);
 }
 function exportJson(){
-  const data = { app:"cennik", version:1, exportedAt:new Date().toISOString(), articles:S.articles, products:S.products, prices:S.prices };
+  const data = Object.assign({ app:"cennik", version:1, appVersion:APP_VERSION, exportedAt:new Date().toISOString() }, buildPayload());
   download(new Blob([JSON.stringify(data)],{type:"application/json"}), `cennik-zaloha-${todayISO()}.json`);
   toast("Záloha uložená");
 }
@@ -1140,6 +1198,254 @@ function importJson(input){
   };
   r.readAsText(f);
 }
+/* ============================================================
+   7c. DÁVKOVÝ IMPORT Z TEXTU
+   ------------------------------------------------------------
+   Prijíma CSV/TSV s hlavičkou. Oddeľovač sa rozpozná sám, rovnako
+   ako desatinná čiarka aj bodka a bežné slovenské formáty dátumu.
+   Nič sa nezapíše bez náhľadu — a každý import dostane svoju značku,
+   aby sa dal celý naraz vrátiť späť.
+   ============================================================ */
+const IMPORT_COLS = {
+  artikel:"artikel", kategoria:"kategoria", znacka:"znacka", variant:"variant",
+  balenie:"balenie", jednotka:"jednotka", cena:"cena", obchod:"obchod",
+  datum:"datum", akcia:"akcia", ean:"ean", poznamka:"poznamka"
+};
+const IMPORT_TEMPLATE =
+`artikel;kategoria;znacka;variant;balenie;jednotka;cena;obchod;datum;akcia;ean
+Mlieko polotučné;Potraviny;Rajo;1,5 %;1000;ml;1,19;Lidl;15.3.2026;;8586001010204
+Mlieko polotučné;Potraviny;Pilos;1,5 %;1000;ml;0,95;Lidl;15.3.2026;ano;20050654
+Toaletný papier;Domácnosť;Zewa;Deluxe;16;ks;6,49;Tesco;16.3.2026;;7322540829723`;
+
+function parseImportDate(v){
+  const t = String(v||"").trim();
+  if(!t) return todayISO();
+  let y, mo, da;
+  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if(m){ y = +m[1]; mo = +m[2]; da = +m[3]; }
+  else {
+    m = t.match(/^(\d{1,2})\s*[.\/]\s*(\d{1,2})\s*[.\/]\s*(\d{2,4})$/);
+    if(!m) return null;
+    da = +m[1]; mo = +m[2]; y = +m[3]; if(y < 100) y += 2000;
+  }
+  // Dátum musí existovať — 32.13. ani 30.2. neprejde.
+  const d = new Date(Date.UTC(y, mo - 1, da));
+  if(d.getUTCFullYear() !== y || d.getUTCMonth() !== mo - 1 || d.getUTCDate() !== da) return null;
+  if(y < 2000 || y > 2100) return null;
+  return `${y}-${String(mo).padStart(2,"0")}-${String(da).padStart(2,"0")}`;
+}
+function parseImport(text){
+  const lines = String(text).split(/\r?\n/).filter(l => l.trim());
+  const errors = [], rows = [];
+  if(lines.length < 2) return { rows, errors:["Súbor musí mať hlavičku a aspoň jeden riadok."], header:[] };
+
+  // Čiarka je až posledná možnosť — kolidovala by s desatinnou čiarkou v cene.
+  let delim = [";","\t","|"].map(d => ({d, n: lines[0].split(d).length}))
+                             .filter(x => x.n >= 2).sort((a,b) => b.n - a.n)[0];
+  if(!delim && lines[0].split(",").length >= 2) delim = { d:",", n:lines[0].split(",").length };
+  if(!delim) return { rows, errors:["Nepodarilo sa rozpoznať stĺpce. Oddeľ ich bodkočiarkou, tabulátorom alebo zvislou čiarou."], header:[] };
+
+  const split = l => l.split(delim.d).map(c => c.trim().replace(/^"(.*)"$/,"$1"));
+  const header = split(lines[0]).map(h => norm(h));
+  const idx = {};
+  Object.keys(IMPORT_COLS).forEach(k => { idx[k] = header.indexOf(k); });
+  for(const need of ["artikel","cena"]){
+    if(idx[need] < 0) errors.push(`Chýba povinný stĺpec „${need}“.`);
+  }
+  if(errors.length) return { rows, errors, header };
+
+  const get = (c, k) => idx[k] >= 0 ? (c[idx[k]] || "") : "";
+  for(let i = 1; i < lines.length; i++){
+    const c = split(lines[i]);
+    const artikel = get(c,"artikel").trim();
+    const price = parseNum(get(c,"cena"));
+    const date = parseImportDate(get(c,"datum"));
+    const rowNo = i + 1;
+    if(!artikel){ errors.push(`Riadok ${rowNo}: chýba artikel.`); continue; }
+    if(price == null || price <= 0){ errors.push(`Riadok ${rowNo}: neplatná cena „${get(c,"cena")}“.`); continue; }
+    if(date == null){ errors.push(`Riadok ${rowNo}: neplatný dátum „${get(c,"datum")}“.`); continue; }
+    let unit = norm(get(c,"jednotka")).replace(/[^a-z]/g,"");
+    if(unit === "gram" || unit === "g") unit = "g";
+    else if(unit === "ml" || unit === "mililiter") unit = "ml";
+    else if(unit === "ks" || unit === "kus" || unit === "kusov") unit = "ks";
+    else unit = "";
+    const pack = parseNum(get(c,"balenie"));
+    rows.push({
+      rowNo, artikel,
+      kategoria: get(c,"kategoria").trim(),
+      znacka: get(c,"znacka").trim(),
+      variant: get(c,"variant").trim(),
+      balenie: pack, jednotka: unit, cena: price,
+      obchod: get(c,"obchod").trim(),
+      datum: date,
+      akcia: /^(ano|áno|1|x|true|akcia)$/i.test(get(c,"akcia").trim()),
+      ean: get(c,"ean").trim(),
+      poznamka: get(c,"poznamka").trim()
+    });
+  }
+  return { rows, errors, header };
+}
+/** Zistí, čo z náhľadu je nové a čo sa napojí na existujúce záznamy. */
+function planImport(rows){
+  const newArts = new Map(), newProds = new Map();
+  const plan = rows.map(r => {
+    const aKey = norm(r.artikel);
+    let a = S.articles.find(x => norm(x.name) === aKey) || newArts.get(aKey);
+    let aNew = false;
+    if(!a){ a = { _key:aKey, name:r.artikel, unit:r.jednotka || "ks", category:r.kategoria || "Ostatné" };
+            newArts.set(aKey, a); aNew = true; }
+    const unit = a.unit;
+    const pKey = r.ean ? "ean:"+r.ean : [aKey, norm(r.znacka), norm(r.variant), r.balenie].join("|");
+    let p = S.products.find(x => r.ean ? x.ean === r.ean
+              : (norm((article(x.articleId)||{}).name||"") === aKey
+                 && norm(x.brand) === norm(r.znacka) && norm(x.name) === norm(r.variant)
+                 && x.packSize === r.balenie)) || newProds.get(pKey);
+    let pNew = false;
+    if(!p){ p = { _key:pKey, _art:a, brand:r.znacka, name:r.variant, packSize:r.balenie, packUnit:unit, ean:r.ean };
+            newProds.set(pKey, p); pNew = true; }
+    return { r, a, p, aNew, pNew, unit };
+  });
+  return { plan, newArts:[...newArts.values()], newProds:[...newProds.values()] };
+}
+
+let _importParsed = null;
+function sheetImportBatch(){
+  openSheet(`<h2>Dávkový import</h2>
+    <p class="note" style="margin:0 0 12px">Textový súbor s hlavičkou. Stĺpce oddeľ <b>bodkočiarkou</b> alebo tabulátorom — čiarka sa bije s desatinnou čiarkou v cenách. Povinné sú len <b>artikel</b> a <b>cena</b>, ostatné môžeš vynechať.</p>
+    <div class="field">
+      <button class="btn block" onclick="document.getElementById('f_batch').click()">Vyber súbor</button>
+      <input id="f_batch" type="file" accept=".csv,.txt,.tsv,text/plain,text/csv" hidden onchange="previewImport(this)"></div>
+    <div class="field"><label class="eyebrow">alebo vlož text priamo</label>
+      <textarea class="input" id="f_batchtext" rows="5" placeholder="artikel;znacka;balenie;jednotka;cena;obchod;datum"></textarea>
+      <button class="btn sm" style="margin-top:6px" onclick="previewImportText()">Zobraz náhľad</button></div>
+    <button class="btn ghost block" onclick="downloadTemplate()">Stiahni vzorový súbor</button>`);
+}
+function downloadTemplate(){
+  download(new Blob(["\uFEFF"+IMPORT_TEMPLATE],{type:"text/csv;charset=utf-8"}), "cennik-vzor.csv");
+}
+function previewImport(input){
+  const f = input.files && input.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = e => showImportPreview(String(e.target.result).replace(/^\uFEFF/,""));
+  r.readAsText(f, "utf-8");
+}
+function previewImportText(){
+  const t = el("f_batchtext").value;
+  if(!t.trim()){ toast("Vlož text"); return; }
+  showImportPreview(t);
+}
+function showImportPreview(text){
+  const parsed = parseImport(text);
+  if(!parsed.rows.length){
+    openSheet(`<h2>Náhľad importu</h2>
+      <div class="banner" style="background:var(--bad-bg);border-color:#E9C3C1;color:var(--bad)">
+        Nedá sa importovať nič.</div>
+      ${parsed.errors.map(e => `<p class="note">${esc(e)}</p>`).join("")}
+      <button class="btn block" style="margin-top:12px" onclick="sheetImportBatch()">Späť</button>`);
+    return;
+  }
+  const { plan, newArts, newProds } = planImport(parsed.rows);
+  _importParsed = { rows: parsed.rows, plan };
+  const show = plan.slice(0, 12);
+  openSheet(`<h2>Náhľad importu</h2>
+    <div style="margin-bottom:12px">
+      <div class="kv"><span>Zápisov cien</span><b class="num">${plan.length}</b></div>
+      <div class="kv"><span>Nových artiklov</span><b class="num">${newArts.length}${newArts.length?" · "+newArts.map(a=>esc(a.name)).join(", "):""}</b></div>
+      <div class="kv"><span>Nových produktov</span><b class="num">${newProds.length}</b></div>
+      <div class="kv"><span>Napojí sa na existujúce</span><b class="num">${plan.filter(x=>!x.pNew).length} ${skloň(plan.filter(x=>!x.pNew).length,"produkt","produkty","produktov")}</b></div>
+    </div>
+    ${parsed.errors.length ? `<div class="banner" style="background:var(--bad-bg);border-color:#E9C3C1;color:var(--bad)">
+      ${parsed.errors.length} ${skloň(parsed.errors.length,"riadok sa preskočí","riadky sa preskočia","riadkov sa preskočí")}</div>
+      ${parsed.errors.slice(0,6).map(e=>`<p class="note">${esc(e)}</p>`).join("")}
+      ${parsed.errors.length>6?`<p class="note">…a ďalších ${parsed.errors.length-6}</p>`:""}` : ""}
+    <div class="eyebrow" style="margin:14px 0 8px">Prvých ${show.length} ${skloň(show.length,"riadok","riadky","riadkov")}</div>
+    <div class="hist">${show.map(x => `<div class="hitem">
+      <span class="hdate num">${fmtDate(x.r.datum)}</span>
+      <span class="hstore">${esc([x.a.name, x.p.brand, x.p.name].filter(Boolean).join(" · "))}
+        ${x.aNew?'<span class="pill tiny bad">nový artikel</span>':""}${x.pNew?'<span class="pill tiny mid">nový</span>':""}${x.r.akcia?'<span class="pill tiny promo">A</span>':""}</span>
+      <span class="hprice num">${fmtEur(x.r.cena)}</span>
+      <span class="hunit num">${x.r.balenie?esc(x.r.balenie+" "+x.unit):""}</span></div>`).join("")}</div>
+    ${plan.length>show.length?`<p class="note">…a ďalších ${plan.length-show.length}</p>`:""}
+    <div class="btnbar" style="margin-top:14px">
+      <button class="btn ghost" onclick="sheetImportBatch()">Späť</button>
+      <button class="btn primary" style="flex:1" onclick="runImport()">Importovať ${plan.length}</button></div>`);
+}
+async function runImport(){
+  if(!_importParsed) return;
+  const batch = new Date().toISOString();
+  const { plan } = _importParsed;
+  const madeArts = {}, madeProds = {};
+  let n = 0;
+  for(const x of plan){
+    let artId;
+    if(x.aNew){
+      if(!madeArts[x.a._key]){
+        const a = { id:uid(), name:x.a.name, unit:x.a.unit, category:x.a.category, batch };
+        S.articles.push(a); await saveRec("articles", a, true); madeArts[x.a._key] = a.id;
+      }
+      artId = madeArts[x.a._key];
+    } else artId = x.a.id;
+
+    let prodId;
+    if(x.pNew){
+      if(!madeProds[x.p._key]){
+        const p = { id:uid(), articleId:artId, brand:x.p.brand, name:x.p.name, ean:x.p.ean,
+                    packSize:x.p.packSize, packUnit:x.p.packUnit, photo:null, onList:false,
+                    createdAt:Date.now(), batch };
+        S.products.push(p); await saveRec("products", p, true); madeProds[x.p._key] = p.id;
+      }
+      prodId = madeProds[x.p._key];
+    } else prodId = x.p.id;
+
+    const rec = { id:uid(), productId:prodId, date:x.r.datum, store:x.r.obchod, price:x.r.cena,
+                  packSize:x.r.balenie || (product(prodId)||{}).packSize, promo:x.r.akcia,
+                  note:x.r.poznamka, createdAt:Date.now(), batch };
+    S.prices.push(rec); await saveRec("prices", rec, true);
+    n++;
+  }
+  scheduleSync();
+  _importParsed = null;
+  closeSheet(); go({name:"home"});
+  toast(`Importovaných ${n} ${skloň(n,"zápis","zápisy","zápisov")}`);
+}
+
+/* --- správa dávok: každý import sa dá vrátiť celý naraz --- */
+function batchList(){
+  const map = {};
+  for(const c of COLLS) for(const r of S[c]) if(r.batch){
+    map[r.batch] = map[r.batch] || { batch:r.batch, articles:0, products:0, prices:0 };
+    map[r.batch][c]++;
+  }
+  return Object.values(map).sort((a,b) => a.batch < b.batch ? 1 : -1);
+}
+function fmtBatch(iso){
+  const d = new Date(iso);
+  return d.toLocaleString("sk-SK",{day:"numeric",month:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit"});
+}
+function sheetBatches(){
+  const list = batchList();
+  openSheet(`<h2>Dávkové importy</h2>
+    <p class="note" style="margin:0 0 12px">Každý import sa dá vrátiť celý naraz — aj so všetkým, čo vytvoril. Ručne zapísané ceny sa nedotkne.</p>
+    ${list.length ? list.map(b => `<div class="row" style="cursor:default">
+      <span class="row-main"><span class="row-title">${esc(fmtBatch(b.batch))}</span>
+        <span class="row-sub">${b.prices} ${skloň(b.prices,"cena","ceny","cien")}${b.products?" · "+b.products+" "+skloň(b.products,"produkt","produkty","produktov"):""}${b.articles?" · "+b.articles+" "+skloň(b.articles,"artikel","artikle","artiklov"):""}</span></span>
+      <button class="btn sm" style="border-color:var(--bad);color:var(--bad)" onclick="deleteBatch('${b.batch}')">Vrátiť</button></div>`).join("")
+      : `<p class="note">Zatiaľ si nič dávkovo neimportoval.</p>`}
+    <button class="btn ghost block" style="margin-top:12px" onclick="sheetImportBatch()">Nový import</button>`);
+}
+async function deleteBatch(batch){
+  const b = batchList().find(x => x.batch === batch); if(!b) return;
+  if(!confirm(`Vrátiť import z ${fmtBatch(batch)}?\n\nZmaže sa ${b.prices} ${skloň(b.prices,"zápis ceny","zápisy cien","zápisov cien")}` +
+    (b.products?`, ${b.products} ${skloň(b.products,"produkt","produkty","produktov")}`:"") +
+    (b.articles?` a ${b.articles} ${skloň(b.articles,"artikel","artikle","artiklov")}`:"") +
+    `.\n\nZápisy, ktoré si urobil ručne, zostanú nedotknuté.`)) return;
+  for(const r of S.prices.filter(x => x.batch === batch))   await killRec("prices", r.id, true);
+  for(const r of S.products.filter(x => x.batch === batch)) await killRec("products", r.id, true);
+  for(const r of S.articles.filter(x => x.batch === batch)) await killRec("articles", r.id, true);
+  scheduleSync();
+  closeSheet(); go({name:"home"}); toast("Import vrátený");
+}
+
 function loadXlsxLib(){
   return new Promise((res, rej) => {
     if(window.XLSX) return res();
@@ -1227,7 +1533,7 @@ async function loadSample(){
    a porovná číslo verzie s tým, ktoré práve beží. Ak sa líši,
    ponúkne aktualizáciu — nič sa nedeje na pozadí bez tvojho vedomia.
    ============================================================ */
-const APP_VERSION = "1.8";
+const APP_VERSION = "1.9";
 const SHELL_CACHE = "cennik-shell-v1";
 let _updSeen = "", _updLast = 0, _updTried = null;
 
