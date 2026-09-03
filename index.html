@@ -396,7 +396,7 @@ const DB = (() => {
    price    { id, productId, date:'YYYY-MM-DD', store, price, packSize, promo:bool, note, createdAt }
 */
 const S = { articles:[], products:[], prices:[], graves:{articles:{},products:{},prices:{}},
-            lastStore:"", route:{name:"home"}, query:"" };
+            lastStore:"", route:{name:"home"}, query:"", searchMode:"articles" };
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 const todayISO = () => new Date().toISOString().slice(0,10);
 
@@ -447,6 +447,16 @@ function searchProducts(q){
   return S.products.filter(p => {
     const a = article(p.articleId);
     const hay = norm([p.brand,p.name,a&&a.name,a&&a.category,p.ean].join(" "));
+    return toks.every(t => hay.includes(t));
+  });
+}
+/** Artikel nájde aj podľa značiek svojich produktov — „Pilos“ nájde „Maslo“. */
+function searchArticles(q){
+  const toks = norm(q).split(/\s+/).filter(Boolean);
+  if(!toks.length) return [];
+  return S.articles.filter(a => {
+    const prods = S.products.filter(p => p.articleId === a.id);
+    const hay = norm([a.name, a.category, ...prods.map(p => [p.brand, p.name, p.ean].join(" "))].join(" "));
     return toks.every(t => hay.includes(t));
   });
 }
@@ -507,6 +517,21 @@ function evaluate(prodId){
            level, title, sub, confidence, refs };
 }
 
+/** Súhrn artikla: najlacnejšia aktuálna značka a rozptyl k najdrahšej.
+    Do porovnania vstupujú len ceny, ktoré nie sú staršie ako STALE_DAYS —
+    inak by „najlacnejšie“ vyhral zabudnutý záznam spred pol roka. */
+function articleSummary(id){
+  const all = ranking(id);
+  const fresh = all.filter(r => r.age <= STALE_DAYS);
+  return {
+    all, fresh,
+    best:  fresh[0] || null,
+    worst: fresh.length > 1 ? fresh[fresh.length-1] : null,
+    brands: S.products.filter(p => p.articleId === id).length,
+    unit: (article(id)||{}).unit
+  };
+}
+
 /** Rebríček značiek v rámci artikla — posledná známa jednotková cena. */
 function ranking(articleId){
   const a = article(articleId); if(!a) return [];
@@ -545,9 +570,10 @@ function render(){
   el("btnList").classList.toggle("on", S.route.name==="list");
   if(S.query.trim()){ v.innerHTML = viewSearch(); }
   else if(S.route.name==="product"){ v.innerHTML = viewProduct(S.route.id); }
+  else if(S.route.name==="article"){ v.innerHTML = viewArticle(S.route.id); }
   else if(S.route.name==="list"){ v.innerHTML = viewList(); }
   else { v.innerHTML = viewHome(); }
-  el("fab").hidden = S.route.name==="product";
+  el("fab").hidden = S.route.name==="product" || S.route.name==="article";
 }
 
 /* ---------- domov ---------- */
@@ -604,6 +630,31 @@ function rowProduct(p){
       <span class="row-unit num">${u!=null?fmtEur(u)+"/"+baseLabel(p.packUnit):""}</span>
     </span></button>`;
 }
+function rowArticle(a){
+  const s = articleSummary(a.id);
+  const u = baseLabel(a.unit);
+  const brands = `${s.brands} ${skloň(s.brands,"značka","značky","značiek")}`;
+  if(!s.best){
+    return `<button class="row" onclick="openArticle('${a.id}')">
+      <span class="row-main"><span class="row-title">${esc(a.name)}</span>
+        <span class="row-sub">${brands} · ${s.all.length ? "len staršie ceny" : "bez cien"}</span></span>
+      <span class="row-right"><span class="row-price num">—</span>
+        <span class="row-unit">za ${esc(u)}</span></span></button>`;
+  }
+  const b = s.best;
+  const spread = s.worst ? Math.round((s.worst.unit / b.unit - 1) * 100) : 0;
+  const sub = [brands, productTitle(b.product), b.last.store, fmtAge(b.last.date)].filter(Boolean).map(esc).join(" · ");
+  return `<button class="row" onclick="openArticle('${a.id}')">
+    <span class="row-main"><span class="row-title">${esc(a.name)}</span>
+      <span class="row-sub">${b.last.promo?'<span class="pill tiny promo">akcia</span> ':""}${sub}</span></span>
+    <span class="row-right"><span class="row-price num">${fmtEur(b.unit)}</span>
+      <span class="row-unit num">za ${esc(u)}${spread > 0 ? " · rozdiel "+spread+" %" : ""}</span></span></button>`;
+}
+function openArticle(id){
+  const prods = S.products.filter(p => p.articleId === id);
+  if(prods.length === 1) go({ name:"product", id:prods[0].id });
+  else go({ name:"article", id });
+}
 function tile(p){
   const last = pricesOf(p.id)[0];
   const u = last ? unitPrice(last.price, last.packSize||p.packSize, p.packUnit) : null;
@@ -614,13 +665,77 @@ function tile(p){
 }
 
 /* ---------- hľadanie ---------- */
+function searchToggle(){
+  const m = S.searchMode;
+  return `<div class="seg" style="margin-bottom:12px">
+    <button class="${m==="articles"?"on":""}" onclick="setSearchMode('articles')">Artikle</button>
+    <button class="${m==="products"?"on":""}" onclick="setSearchMode('products')">Produkty</button></div>`;
+}
+async function setSearchMode(m){
+  S.searchMode = m;
+  await DB.put("meta", { id:"searchMode", value:m });
+  render();
+}
 function viewSearch(){
-  const res = searchProducts(S.query);
-  if(!res.length) return `<div class="empty"><b>Nič sa nenašlo</b>
-    <p>„${esc(S.query)}“ zatiaľ v Cenníku nie je.</p>
-    <button class="btn primary" onclick="sheetNewProduct('${esc(S.query).replace(/'/g,"")}')">Pridaj ako nový produkt</button></div>`;
-  return `<div class="section" style="margin-top:4px"><span class="eyebrow">Nájdené · ${res.length}</span><div class="hr" style="margin-top:8px"></div>
-    ${res.map(p=>rowProduct(p)).join("")}</div>`;
+  const byArticle = S.searchMode === "articles";
+  const res = byArticle ? searchArticles(S.query) : searchProducts(S.query);
+  const head = searchToggle();
+  if(!res.length){
+    const other = byArticle ? searchProducts(S.query).length : searchArticles(S.query).length;
+    return `${head}<div class="empty"><b>Nič sa nenašlo</b>
+      <p>„${esc(S.query)}“ ${other ? `medzi ${byArticle?"artiklami":"produktmi"} nie je — v druhom režime ${other===1?"je 1 výsledok":"sú výsledky"}.` : "zatiaľ v Cenníku nie je."}</p>
+      <button class="btn primary" onclick="sheetNewProduct('${esc(S.query).replace(/'/g,"")}')">Pridaj ako nový produkt</button></div>`;
+  }
+  return `${head}<div class="section" style="margin-top:0">
+    <span class="eyebrow">Nájdené · ${res.length}${byArticle?" · najlacnejšia aktuálna cena":""}</span>
+    <div class="hr" style="margin-top:8px"></div>
+    ${byArticle ? res.map(a=>rowArticle(a)).join("") : res.map(p=>rowProduct(p)).join("")}</div>`;
+}
+
+/* ---------- obrazovka artikla: rebríček značiek ---------- */
+function viewArticle(id){
+  const a = article(id);
+  if(!a) return `<div class="empty"><b>Artikel neexistuje</b><button class="btn ghost" onclick="go({name:'home'})">Späť</button></div>`;
+  const s = articleSummary(id);
+  const u = baseLabel(a.unit);
+  const best = s.best;
+  return `
+  <div style="display:flex;align-items:center;gap:8px;margin:-4px 0 12px">
+    <button class="icon-btn" onclick="go({name:'home'})" aria-label="Späť">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <span class="eyebrow" style="flex:1">${esc(a.category||"Artikel")}</span>
+    <button class="icon-btn" onclick="sheetEditArticle('${id}')" aria-label="Upraviť">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 20h4L20 8l-4-4L4 16v4z"/></svg></button>
+  </div>
+
+  <div class="cenovka">
+    <div class="cv-top">
+      <div class="cv-brand">${s.brands} ${skloň(s.brands,"značka","značky","značiek")}</div>
+      <div class="cv-name">${esc(a.name)}</div>
+      ${best ? `
+        <div class="cv-price"><b class="num">${fmtEur(best.unit)}</b><span>za ${esc(u)}</span></div>
+        <div class="cv-unit"><small>Najlacnejšie teraz</small><b>${esc(productTitle(best.product))}</b></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+          ${best.last.promo?'<span class="pill promo">Akciová cena</span>':""}
+          <span class="pill flat">${esc(best.last.store||"bez obchodu")}</span>
+          <span class="pill flat">${fmtAge(best.last.date)}</span>
+          ${s.worst?`<span class="pill flat">najdrahšia o ${Math.round((s.worst.unit/best.unit-1)*100)} % viac</span>`:""}
+        </div>`
+      : `<div class="cv-price"><b class="num">—</b><span>za ${esc(u)}</span></div>
+         <div class="cv-unit"><small>Najlacnejšie teraz</small><b>${s.all.length?"len staršie ceny":"bez cien"}</b></div>
+         <div style="height:12px"></div>`}
+    </div>
+  </div>
+
+  <div class="section" style="margin-top:6px">
+    <div class="section-head"><span class="eyebrow">Rebríček · cena za ${esc(u)}</span></div><div class="hr"></div>
+    ${s.all.length ? s.all.map((r,i)=>rankRow(r,i,s.all[0].unit,null)).join("")
+      : `<p class="note">Žiadna značka zatiaľ nemá zapísanú cenu.</p>`}
+    <p class="note">Do „najlacnejšie teraz“ vstupujú len ceny nie staršie ako ${STALE_DAYS} dní. Vyblednuté záznamy sú staršie a v rebríčku zostávajú len pre prehľad.</p>
+  </div>
+
+  <button class="btn block" onclick="sheetNewProduct('', '${id}')" style="margin-top:10px">Pridaj ďalšiu značku</button>
+  <div style="height:20px"></div>`;
 }
 
 /* ---------- nákupný zoznam ---------- */
@@ -650,7 +765,7 @@ function viewProduct(id){
   <div style="display:flex;align-items:center;gap:8px;margin:-4px 0 12px">
     <button class="icon-btn" onclick="go({name:'home'})" aria-label="Späť">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
-    <button class="eyebrow" style="flex:1;text-align:left;padding:6px 0" onclick="sheetEditArticle('${p.articleId}')">${esc(a.name)} ›</button>
+    <button class="eyebrow" style="flex:1;text-align:left;padding:6px 0" onclick="go({name:'article',id:'${p.articleId}'})">${esc(a.name)} ›</button>
     <button class="icon-btn ${p.onList?"on":""}" onclick="toggleList('${id}')" title="Na nákupný zoznam" aria-label="Na nákupný zoznam">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg></button>
     <button class="icon-btn" onclick="sheetEditProduct('${id}')" aria-label="Upraviť">
@@ -749,6 +864,7 @@ function refsBlock(p, ev){
 
 function rankRow(r, i, best, currentId){
   const p = r.product, diff = best ? (r.unit/best - 1)*100 : 0;
+  if(!best) return "";
   const stale = r.age > STALE_DAYS;
   return `<button class="row ${stale?"stale":""}" style="${p.id===currentId?"border-color:var(--ink);border-width:1.5px":""}" onclick="go({name:'product',id:'${p.id}'})">
     <span class="eyebrow num" style="width:16px">${i+1}</span>
@@ -1533,7 +1649,7 @@ async function loadSample(){
    a porovná číslo verzie s tým, ktoré práve beží. Ak sa líši,
    ponúkne aktualizáciu — nič sa nedeje na pozadí bez tvojho vedomia.
    ============================================================ */
-const APP_VERSION = "1.9";
+const APP_VERSION = "2.0";
 const SHELL_CACHE = "cennik-shell-v1";
 let _updSeen = "", _updLast = 0, _updTried = null;
 
@@ -1836,6 +1952,7 @@ el("btnList").onclick = () => go({name: S.route.name==="list" ? "home" : "list"}
   const meta = await DB.all("meta");
   const ls = meta.find(m=>m.id==="lastStore"); if(ls) S.lastStore = ls.value;
   const ut = meta.find(m=>m.id==="updTried"); if(ut) _updTried = ut.value;
+  const sm = meta.find(m=>m.id==="searchMode"); if(sm) S.searchMode = sm.value;
   await loadSyncCfg();
   render();
   setSync(SYNC.cfg.token && SYNC.cfg.gistId ? "idle" : "off");
